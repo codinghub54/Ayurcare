@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "ipAddress" TEXT,
+ADD COLUMN IF NOT EXISTS "userAgent" TEXT;
