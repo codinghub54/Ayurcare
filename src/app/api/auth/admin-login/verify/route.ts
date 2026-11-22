@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const code = typeof body.code === 'string' ? body.code.trim() : '';
     if (!/^\d{4,10}$/.test(code)) {
-      return NextResponse.json({ error: 'Enter the verification code from your SMS.' }, { status: 400 });
+      return NextResponse.json({ error: 'Enter the verification code sent to your email.' }, { status: 400 });
     }
 
     const challenge = await prisma.otpVerification.findFirst({

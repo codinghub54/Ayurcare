@@ -60,6 +60,26 @@ export async function sendOtpEmail(toEmail: string, otpCode: string) {
   return sendEmail({ to: toEmail, subject: 'Verify your VedaSync account', html });
 }
 
+export async function sendAdminLoginOtpEmail(toEmail: string, otpCode: string) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #0f172a; color: #f8fafc;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #ef4444; margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">AyurCare Security Alert</h2>
+        <p style="color: #94a3b8; font-size: 14px; margin-top: 5px;">Administrator Two-Factor Authentication</p>
+      </div>
+      <div style="background-color: #1e293b; padding: 20px; border-radius: 8px; border: 1px solid #334155;">
+        <p style="font-size: 15px; color: #cbd5e1; margin-top: 0;">An administrator login attempt was initiated for the AyurCare Control Panel. Use the 6-digit verification code below to authorize access:</p>
+        <div style="background-color: #0f172a; padding: 18px; text-align: center; border-radius: 8px; margin: 20px 0; border: 1px solid #ef4444;">
+          <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #38bdf8; font-family: monospace;">${otpCode}</span>
+        </div>
+        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">This code will expire in <strong>10 minutes</strong>. If you did not initiate this login, someone may be attempting to access your account. Please change your password immediately.</p>
+      </div>
+      <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 25px;">AyurCare Telemedicine Platform &bull; Automated Security Protocol</p>
+    </div>
+  `;
+  return sendEmail({ to: toEmail, subject: `AyurCare Admin 2FA Code: ${otpCode}`, html });
+}
+
 export async function sendResetPasswordEmail(toEmail: string, resetLinkOrOtp: string) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">

@@ -109,7 +109,7 @@ export default function AdminLogin() {
               Enter the verification code sent to <strong>{maskedPhone}</strong>.
             </p>
             <div>
-              <label htmlFor="admin-sms-otp" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">SMS verification code</label>
+              <label htmlFor="admin-sms-otp" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">2FA Verification code (sent to email)</label>
               <input
                 id="admin-sms-otp"
                 type="text"
@@ -120,7 +120,7 @@ export default function AdminLogin() {
                 required
                 value={smsOtp}
                 onChange={(e) => setSmsOtp(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="Enter code"
+                placeholder="Enter 6-digit OTP"
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 text-sm"
               />
             </div>

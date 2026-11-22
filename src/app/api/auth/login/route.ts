@@ -5,7 +5,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { setAuthCookies } from '@/lib/jwt';
 import { signAdminLoginChallengeToken } from '@/lib/admin-login-challenge';
-import { generateAdminLoginCode, getAdminOtpPhone, hashAdminLoginCode, sendAdminLoginCode, TwilioSmsError } from '@/lib/twilio-verify';
+import { generateAdminLoginCode, hashAdminLoginCode } from '@/lib/twilio-verify';
+import { sendAdminLoginOtpEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
@@ -96,23 +97,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const hasAdminSmsConfig = Boolean(
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_FROM_NUMBER &&
-      process.env.ADMIN_LOGIN_OTP_PHONE
-    );
-
-    if (user.role === 'ADMIN' && hasAdminSmsConfig) {
+    if (user.role === 'ADMIN') {
+      const targetAdminEmail = process.env.ADMIN_OTP_EMAIL || 'manashsri4@gmail.com';
       const minuteAgo = new Date(Date.now() - 60 * 1000);
       const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
       const [sentInLastMinute, sentInLastHour] = await Promise.all([
         prisma.otpVerification.count({ where: { userId: user.id, purpose: 'ADMIN_SMS_LOGIN', createdAt: { gt: minuteAgo } } }),
         prisma.otpVerification.count({ where: { userId: user.id, purpose: 'ADMIN_SMS_LOGIN', createdAt: { gt: hourAgo } } }),
       ]);
-      if (sentInLastMinute >= 1 || sentInLastHour >= 5) {
+      if (sentInLastMinute >= 2 || sentInLastHour >= 10) {
         return NextResponse.json(
-          { error: 'Too many SMS codes requested. Wait before trying again.' },
+          { error: 'Too many verification codes requested. Wait a moment before trying again.' },
           { status: 429 }
         );
       }
@@ -123,26 +118,21 @@ export async function POST(request: Request) {
           userId: user.id,
           code: hashAdminLoginCode(code),
           purpose: 'ADMIN_SMS_LOGIN',
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
         },
       });
 
       try {
-        await sendAdminLoginCode(code);
+        await sendAdminLoginOtpEmail(targetAdminEmail, code);
       } catch (error) {
         await prisma.otpVerification.update({
           where: { id: challenge.id },
           data: { used: true },
         });
-        console.error(
-          'Admin SMS verification delivery failed:',
-          error instanceof TwilioSmsError ? `Twilio status ${error.status}` : 'Provider configuration or network error'
-        );
-        return NextResponse.json({ error: 'Could not send the admin verification code. Try again later.' }, { status: 503 });
+        console.error('Admin email verification delivery failed:', error);
+        return NextResponse.json({ error: `Could not send the admin verification code to ${targetAdminEmail}. Please check email service.` }, { status: 503 });
       }
 
-      const phone = getAdminOtpPhone();
-      const maskedPhone = `${phone.slice(0, 3)}${'•'.repeat(Math.max(0, phone.length - 7))}${phone.slice(-4)}`;
       const cookieStore = await cookies();
       cookieStore.set('adminLoginChallenge', signAdminLoginChallengeToken({
         userId: user.id,
@@ -151,7 +141,7 @@ export async function POST(request: Request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 5 * 60,
+        maxAge: 10 * 60,
         path: '/api/auth/admin-login',
       });
 
@@ -163,16 +153,16 @@ export async function POST(request: Request) {
         await tx.auditLog.create({
           data: {
             actorUserId: user.id,
-            action: 'ADMIN_SMS_LOGIN_CODE_SENT',
-            metadata: JSON.stringify({ challengeId: challenge.id, phoneLast4: phone.slice(-4) }),
+            action: 'ADMIN_EMAIL_LOGIN_CODE_SENT',
+            metadata: JSON.stringify({ challengeId: challenge.id, recipientEmail: targetAdminEmail }),
           },
         });
       });
 
       return NextResponse.json({
         requiresSmsOtp: true,
-        maskedPhone,
-        message: 'A sign-in verification code was sent to the registered admin mobile.',
+        maskedPhone: targetAdminEmail,
+        message: `A verification code was sent to ${targetAdminEmail}.`,
       });
     }
 
