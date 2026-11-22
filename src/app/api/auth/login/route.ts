@@ -96,7 +96,14 @@ export async function POST(request: Request) {
       );
     }
 
-    if (user.role === 'ADMIN') {
+    const hasAdminSmsConfig = Boolean(
+      process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER &&
+      process.env.ADMIN_LOGIN_OTP_PHONE
+    );
+
+    if (user.role === 'ADMIN' && hasAdminSmsConfig) {
       const minuteAgo = new Date(Date.now() - 60 * 1000);
       const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
       const [sentInLastMinute, sentInLastHour] = await Promise.all([
