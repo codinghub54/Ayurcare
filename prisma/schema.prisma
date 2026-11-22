@@ -1,0 +1,417 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                  String            @id @default(uuid())
+  role                String            // "ADMIN", "DOCTOR", "PATIENT"
+  email               String            @unique
+  emailVerified       Boolean           @default(false)
+  phone               String?
+  passwordHash        String
+  name                String
+  avatarImage         String?
+  status              String            @default("PENDING") // "ACTIVE", "PENDING", "SUSPENDED", "BANNED"
+  suspensionReason    String?
+  failedLoginAttempts Int               @default(0)
+  lockoutUntil        DateTime?
+  createdAt           DateTime          @default(now())
+  lastLoginAt         DateTime?
+  
+  refreshTokens       RefreshToken[]
+  otpVerifications    OtpVerification[]
+  doctorProfile       DoctorProfile?
+  patientProfile      PatientProfile?
+  
+  auditLogs           AuditLog[]        @relation("Actor")
+  targetAuditLogs     AuditLog[]        @relation("TargetUser")
+  notifications       Notification[]
+  supportTickets      SupportTicket[]
+  assignedTickets     SupportTicket[]   @relation("AssignedAdmin")
+  couponUsages        CouponUsage[]
+  wallet              Wallet?
+  adminSecurityProfile AdminSecurityProfile?
+  activeSessions      ActiveSession[]
+  securityAlerts      SecurityAlert[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  purpose   String   // "SIGNUP", "RESET_PASSWORD"
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model DoctorProfile {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qualification   String
+  regNumber       String   @unique
+  specializations String   // Comma-separated list of specializations
+  experienceYears Int
+  bio             String?
+  feePerConsult   Float
+  documents       String   // Comma-separated URLs or names
+  isApproved      Boolean  @default(false)
+  approvalStatus  String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "MORE_INFO"
+  rejectionReason String?
+  avgRating       Float    @default(0)
+  languages       String   @default("English, Hindi")
+  clinicAddress   String?
+  signatureUrl    String?
+  availability    String?  // JSON string storing slots configuration
+  aadhaarNumber   String?
+  faceIdImage     String?
+
+  appointments    Appointment[]
+  reviews         Review[]
+  prescriptions   Prescription[]
+  payoutBatches   PayoutBatch[]
+}
+
+model PatientProfile {
+  userId             String          @id
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dob                DateTime?
+  gender             String?
+  bloodGroup         String?
+  doshaType          String?         // Calculated Dosha dominance: "VATA", "PITTA", "KAPHA", etc.
+  allergies          String?         // Comma-separated or custom text
+  chronicConditions  String?         // Comma-separated or custom text
+  lifestyleData      String?         // JSON string: {diet, exercise, stress, sleep, etc.}
+  emergencyContact   String?         // JSON string: {name, relation, phone}
+
+  familyMembers      FamilyMember[]
+  appointments       Appointment[]
+  labReports         LabReport[]
+  aiChatSessions     AIChatSession[]
+  prescriptions      Prescription[]
+  auditLogs          AuditLog[]      @relation("TargetPatient")
+}
+
+model FamilyMember {
+  id               String         @id @default(uuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [userId], onDelete: Cascade)
+  name             String
+  relation         String
+  dob              DateTime?
+  gender           String?
+  profileData      String?        // JSON string for specific medical info
+
+  appointments     Appointment[]
+}
+
+model Appointment {
+  id             String         @id @default(uuid())
+  patientId      String
+  patient        PatientProfile @relation(fields: [patientId], references: [userId], onDelete: Cascade)
+  doctorId       String
+  doctor         DoctorProfile  @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+  familyMemberId String?
+  familyMember   FamilyMember?  @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  scheduledAt    DateTime
+  type           String         // "CHAT", "AUDIO", "VIDEO"
+  status         String         @default("PENDING") // "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"
+  feePaid        Float
+  createdAt      DateTime       @default(now())
+
+  payment        Payment?
+  consultation   Consultation?
+  reviews        Review[]
+}
+
+model Consultation {
+  id                 String         @id @default(uuid())
+  appointmentId      String         @unique
+  appointment        Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  notes              String?
+  privateDoctorNotes String?
+  diagnosis          String?
+  startedAt          DateTime?
+  endedAt            DateTime?
+
+  prescriptions      Prescription[]
+}
+
+model Prescription {
+  id              String         @id @default(uuid())
+  consultationId  String?
+  consultation    Consultation?  @relation(fields: [consultationId], references: [id], onDelete: SetNull)
+  doctorId        String
+  doctor          DoctorProfile  @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+  patientId       String
+  patient         PatientProfile @relation(fields: [patientId], references: [userId], onDelete: Cascade)
+  medicines       String         // JSON string representation of medicine items
+  dietInstructions String?
+  lifestyleAdvice String?
+  status          String         @default("ACTIVE") // "ACTIVE", "COMPLETED", "DISCONTINUED"
+  pdfUrl          String?
+  assignedAt      DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model LabReport {
+  id          String         @id @default(uuid())
+  patientId   String
+  patient     PatientProfile @relation(fields: [patientId], references: [userId], onDelete: Cascade)
+  uploadedBy  String         // e.g. "DOCTOR" or "PATIENT"
+  fileUrl     String
+  description String?
+  uploadedAt  DateTime       @default(now())
+}
+
+model AIChatSession {
+  id               String         @id @default(uuid())
+  patientId        String
+  patient          PatientProfile @relation(fields: [patientId], references: [userId], onDelete: Cascade)
+  messages         String         // JSON string for messages list
+  summary          String?
+  flaggedForReview Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  amount        Float
+  commission    Float
+  status        String      // PENDING, SUCCESS, FAILED
+  gatewayRefId  String?
+  createdAt     DateTime    @default(now())
+
+  refunds       RefundRecord[]
+}
+
+model Review {
+  id            String        @id @default(uuid())
+  appointmentId String
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patientId     String
+  doctorId      String
+  doctor        DoctorProfile @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+  rating        Int
+  comment       String?
+  createdAt     DateTime      @default(now())
+}
+
+model AuditLog {
+  id              String          @id @default(uuid())
+  actorUserId     String
+  actor           User            @relation("Actor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  action          String
+  targetUserId    String?
+  targetUser      User?           @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetPatientId String?
+  targetPatient   PatientProfile? @relation("TargetPatient", fields: [targetPatientId], references: [userId], onDelete: SetNull)
+  metadata        String?         // JSON string of extra metadata
+  ipAddress       String?
+  userAgent       String?
+  timestamp       DateTime        @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  type      String   // APPOINTMENT, CHAT, PRESCRIPTION, SYSTEM
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject         String
+  message         String
+  status          String         @default("OPEN") // "OPEN", "IN_PROGRESS", "RESOLVED"
+  assignedAdminId String?
+  assignedAdmin   User?          @relation("AssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+}
+
+model Medicine {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  dosage           String
+  anupana          String   // vehicle: warm water, honey, milk
+  prescriptionOnly Boolean  @default(false)
+  description      String?
+  createdAt        DateTime @default(now())
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  patientId String
+  name      String
+  dosage    String
+  price     Float    @default(150.0)
+  quantity  Int      @default(1)
+  addedAt   DateTime @default(now())
+}
+
+model Coupon {
+  id                 String        @id @default(uuid())
+  code               String        @unique
+  discountType       String        // "FLAT", "PERCENT"
+  discountValue      Float
+  minOrderValue      Float         @default(0)
+  maxDiscountAmount  Float?        // Optional cap for percentage coupons
+  maxUsesTotal       Int           @default(100)
+  usedCount          Int           @default(0)
+  perUserLimit       Int           @default(1)
+  applicableDoctorId String?       // Null = applicable to all doctors
+  consultationType   String?       // "CHAT", "AUDIO", "VIDEO", or Null for all
+  startDate          DateTime      @default(now())
+  expiryDate         DateTime
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+
+  usages             CouponUsage[]
+}
+
+model CouponUsage {
+  id             String   @id @default(uuid())
+  couponId       String
+  coupon         Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointmentId  String?
+  discountAmount Float
+  usedAt         DateTime @default(now())
+}
+
+model Wallet {
+  userId       String              @id
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance      Float               @default(0.0)
+  updatedAt    DateTime            @updatedAt
+
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [userId], onDelete: Cascade)
+  type        String   // "CREDIT", "DEBIT", "REFUND", "LOYALTY", "PROMO"
+  amount      Float
+  description String
+  referenceId String?  // Appointment ID or Stripe Refund ID
+  createdAt   DateTime @default(now())
+}
+
+model CommissionConfig {
+  id             String   @id @default(uuid())
+  tierName       String   @unique // "STANDARD", "GOLD", "PLATINUM", "SPECIALIST"
+  commissionRate Float    // e.g. 0.15 for 15%, 0.10 for 10%
+  description    String?
+  updatedBy      String
+  updatedAt      DateTime @updatedAt
+}
+
+model PayoutBatch {
+  id           String        @id @default(uuid())
+  doctorId     String
+  doctor       DoctorProfile @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+  amount       Float
+  status       String        @default("PENDING") // "PENDING", "HOLD", "PROCESSING", "COMPLETED", "FAILED"
+  payoutMethod String        // "BANK_TRANSFER", "UPI"
+  payoutRef    String?
+  holdReason   String?
+  processedAt  DateTime?
+  createdAt    DateTime      @default(now())
+}
+
+model RefundRecord {
+  id             String   @id @default(uuid())
+  paymentId      String
+  payment        Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount         Float
+  reason         String
+  refundType     String   // "FULL", "PARTIAL", "WALLET_CREDIT"
+  processedBy    String   // Admin user ID or "SYSTEM"
+  stripeRefundId String?
+  createdAt      DateTime @default(now())
+}
+
+model AdminSecurityProfile {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totpSecret  String?
+  totpEnabled Boolean  @default(false)
+  adminRole   String   @default("SUPER_ADMIN") // "SUPER_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN"
+  permissions String   @default("*") // JSON string or "*"
+  ipAllowlist String?  // JSON array of allowed IPs
+  updatedAt   DateTime @updatedAt
+}
+
+model ActiveSession {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String   @unique
+  ipAddress    String?
+  userAgent    String?
+  isRevoked    Boolean  @default(false)
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+}
+
+model SecurityAlert {
+  id         String   @id @default(uuid())
+  severity   String   // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  alertType  String   // "FAILED_ADMIN_LOGIN", "NEW_IP_LOGIN", "SUSPICIOUS_ACCESS", "SESSION_REVOKED"
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipAddress  String?
+  details    String?  // JSON string
+  isResolved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model FeatureFlag {
+  id            String   @id @default(uuid())
+  key           String   @unique
+  name          String
+  description   String?
+  isEnabled     Boolean  @default(true)
+  targetSegment String   @default("ALL") // "ALL", "PATIENT", "DOCTOR"
+  updatedBy     String?
+  updatedAt     DateTime @updatedAt
+}
+
+model SystemAnnouncement {
+  id         String   @id @default(uuid())
+  title      String
+  message    String
+  targetRole String   @default("ALL") // "ALL", "PATIENT", "DOCTOR"
+  severity   String   @default("INFO") // "INFO", "WARNING", "URGENT"
+  isBanner   Boolean  @default(false)
+  sentBy     String
+  createdAt  DateTime @default(now())
+}
+
+
+
