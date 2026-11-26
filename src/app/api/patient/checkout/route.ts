@@ -6,6 +6,7 @@ import { createOrder, getRazorpayKeyId, RazorpayNotConfiguredError } from '@/lib
 import { apiError, PublicError } from '@/lib/api-error';
 import { CONSULT_TYPES, type ConsultType, assertSlotAvailable, quoteConsultation, finalizeBooking } from '@/lib/booking';
 import { getConsultFees, CONSULT_TYPE_LABELS } from '@/lib/doctor-fees';
+import { getDoctorSlots } from '@/lib/ayurbot-agent';
 
 const COMMISSION_RATE = 0.15;
 
@@ -52,6 +53,14 @@ export async function POST(request: Request) {
     }
 
     const scheduledAt = await assertSlotAvailable(doctorId, patient.userId, body.scheduledAt);
+
+    // The time must be one of the doctor's published, still-open slots (IST)
+    const istDate = scheduledAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const istTime = scheduledAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    const open = await getDoctorSlots(doctorId, istDate);
+    if ('error' in open || !open.openSlots.includes(istTime)) {
+      throw new PublicError('That time is outside the doctor\'s consulting hours or already taken. Please pick another slot.');
+    }
     const quote = await quoteConsultation({
       patientId: patient.userId,
       doctorId,

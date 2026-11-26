@@ -1,822 +1,494 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
-import { Loader2, Video, Send, FileText, ClipboardList, ShieldCheck, Heart, User, Clock, CheckCircle, Calendar, Plus, ExternalLink, Lock } from 'lucide-react';
+import React, { use, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Pill,
+  ClipboardList,
+  Lock,
+  History,
+  Plus,
+  Trash2,
+  FileText,
+  WifiOff,
+  ArrowLeft,
+} from 'lucide-react';
+import { useConsultationRoom, type MedicineItem, type Report } from '@/components/consultation/useConsultationRoom';
+import CallStage from '@/components/consultation/CallStage';
+import ChatPanel from '@/components/consultation/ChatPanel';
 
-interface MedicineItem {
-  name: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
-  anupana: string;
-  notes?: string;
-  price?: number;
+type Tab = 'rx' | 'summary' | 'private' | 'history';
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+const EMPTY_MED: MedicineItem = { name: '', dosage: '', frequency: '', timing: '', anupana: '', duration: '', notes: '' };
+const FREQUENCIES = ['1-0-1', '1-0-0', '0-0-1', '1-1-1', '0-1-0', 'Once a day', 'Twice a day', 'SOS (when needed)'];
+const TIMINGS = ['After food', 'Before food', 'Empty stomach', 'At bedtime', 'With food'];
+const ANUPANAS = ['Warm water', 'Lukewarm water', 'Honey', 'Warm milk', 'Ghee', 'Buttermilk', 'Coconut water'];
+const DURATIONS = ['5 days', '7 days', '14 days', '21 days', '1 month', '2 months', '3 months'];
+
+const input =
+  'w-full rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-forest focus:outline-none focus:ring-4 focus:ring-forest/10 disabled:bg-bg disabled:text-ink-muted';
+const textarea = `${input} min-h-[110px] resize-y leading-relaxed`;
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
 }
 
-export default function DoctorConsultationRoom() {
-  const router = useRouter();
-  const params = useParams();
-  const appointmentId = params.id as string;
+export default function DoctorConsultationRoom({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const room = useConsultationRoom(id);
+  const { data } = room;
 
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
-  const [catalog, setCatalog] = useState<any[]>([]);
+  const [tab, setTab] = useState<Tab>('rx');
+  const [draft, setDraft] = useState<Report | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveError, setSaveError] = useState('');
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+  const [catalog, setCatalog] = useState<{ name: string; dosage: string; anupana: string }[]>([]);
+  const dirty = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftRef = useRef<Report | null>(null);
 
-  // Video & 1:30 hr Timer states
-  const [timeLeftStr, setTimeLeftStr] = useState('1h 30m 00s');
-  const [isExpired, setIsExpired] = useState(false);
-  const [callConnected, setCallConnected] = useState(false);
-
-  // Embedded video iframe room URL
-  const embedVideoUrl = `https://meet.jit.si/AyurCare-Consultation-${appointmentId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&interfaceConfig.TOOLBAR_BUTTONS=['microphone','camera','desktop','fullscreen','hangup']`;
-
-  // Socket.io / Chat states
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  
-  // Tabs: 'history' (Patient 360), 'prescription' (E-Rx Builder), 'notes' (Clinical Notes & Followup)
-  const [activeTab, setActiveTab] = useState<'history' | 'prescription' | 'notes'>('history');
-
-  // E-Prescription Builder states
-  const [prescriptionMedicines, setPrescriptionMedicines] = useState<MedicineItem[]>([]);
-  const [medSearch, setMedSearch] = useState('');
-  const [selectedMed, setSelectedMed] = useState<any>(null);
-  const [dosage, setDosage] = useState('1 tablet');
-  const [frequency, setFrequency] = useState('Twice daily');
-  const [duration, setDuration] = useState('7 days');
-  const [anupana, setAnupana] = useState('Warm water');
-  const [medNotes, setMedNotes] = useState('');
-
-  const [dietInstructions, setDietInstructions] = useState('');
-  const [lifestyleAdvice, setLifestyleAdvice] = useState('');
-  
-  // Clinical Notes states
-  const [notes, setNotes] = useState('');
-  const [privateNotes, setPrivateNotes] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-
-  const [savingLoading, setSavingLoading] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState('');
-
-  // Follow-up meeting scheduling states
-  const [followupDate, setFollowupDate] = useState('');
-  const [followupType, setFollowupType] = useState('VIDEO');
-  const [schedulingFollowup, setSchedulingFollowup] = useState(false);
-  const [followupSuccess, setFollowupSuccess] = useState('');
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const fetchConsultationData = async () => {
-    try {
-      const res = await fetch(`/api/doctor/consultations/${appointmentId}`);
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-        setNotes(json.appointment.consultation?.notes || '');
-        setPrivateNotes(json.appointment.consultation?.privateDoctorNotes || '');
-        setDiagnosis(json.appointment.consultation?.diagnosis || '');
-      } else {
-        router.push('/doctor/dashboard');
-      }
-
-      // Fetch medicine catalog for Rx builder
-      const catalogRes = await fetch('/api/admin/catalog');
-      if (catalogRes.ok) {
-        const json = await catalogRes.json();
-        setCatalog(json.medicines);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  // Load the saved draft once
+  useEffect(() => {
+    if (data && !draftRef.current) {
+      const initial = { ...data.report, privateDoctorNotes: data.report.privateDoctorNotes || '' };
+      draftRef.current = initial;
+      setDraft(initial);
     }
-  };
-
-  useEffect(() => {
-    fetchConsultationData();
-  }, [appointmentId]);
-
-  // 1:30 Hr Strict Duration Timer Countdown
-  useEffect(() => {
-    if (!data?.appointment?.scheduledAt) return;
-
-    const scheduledAt = new Date(data.appointment.scheduledAt).getTime();
-    const endWindow = scheduledAt + 90 * 60 * 1000; // 90 minutes
-
-    const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const diff = endWindow - now;
-
-      if (diff <= 0) {
-        setIsExpired(true);
-        setTimeLeftStr('00h 00m 00s (Session Concluded)');
-        clearInterval(timer);
-      } else {
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeftStr(`${hours}h ${minutes < 10 ? '0' : ''}${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
   }, [data]);
 
-  useEffect(() => {
-    if (!data) return;
+  const completed = room.status === 'COMPLETED';
+  const active = room.status === 'CONFIRMED';
 
-    // Connect to Socket.io server for real-time sync
-    const socketInstance = io();
-    setSocket(socketInstance);
-
-    const doctorName = data.appointment.doctor?.user?.name || 'Doctor';
-    const userId = data.appointment.doctorId;
-
-    socketInstance.emit('join-room', {
-      roomId: appointmentId,
-      userId,
-      userName: doctorName,
-    });
-
-    setCallConnected(true);
-
-    socketInstance.on('user-joined', ({ userName }) => {
-      setMessages((prev) => [
-        ...prev,
-        { system: true, message: `System: Patient ${userName} joined the video consultation.` }
-      ]);
-    });
-
-    socketInstance.on('receive-message', (msgObj) => {
-      setMessages((prev) => [...prev, msgObj]);
-    });
-
-    socketInstance.on('user-left', () => {
-      setMessages((prev) => [
-        ...prev,
-        { system: true, message: `System: Patient left room.` }
-      ]);
-    });
-
-    return () => {
-      socketInstance.disconnect();
-    };
-  }, [data]);
-
-  // Stream report edits live to the patient's screen
-  useEffect(() => {
-    if (socket && callConnected && !loading && !savingLoading) {
-      socket.emit('update-report', {
-        roomId: appointmentId,
-        diagnosis,
-        notes,
-        dietInstructions,
-        lifestyleAdvice,
-      });
-    }
-  }, [diagnosis, notes, dietInstructions, lifestyleAdvice, socket, callConnected, loading, savingLoading]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !socket || !data) return;
-
-    socket.emit('send-message', {
-      roomId: appointmentId,
-      message: chatInput,
-      senderId: data.appointment.doctorId,
-      senderName: data.appointment.doctor?.user?.name || 'Doctor',
-      senderRole: 'DOCTOR',
-    });
-    setChatInput('');
-  };
-
-  const handleAddMedicine = async () => {
-    const medName = selectedMed ? selectedMed.name : medSearch;
-    if (!medName) return;
-
-    const price = selectedMed?.price || 150.0;
-
-    const newItem: MedicineItem = {
-      name: medName,
-      dosage,
-      frequency,
-      duration,
-      anupana,
-      notes: medNotes,
-      price,
-    };
-
-    // If meeting is active, add live to patient's cart!
-    const isMeetingActive = data?.appointment?.status !== 'COMPLETED' && !isExpired;
-    if (isMeetingActive) {
-      try {
-        const cartRes = await fetch('/api/patient/cart', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patientId: data.appointment.patientId,
-            appointmentId,
-            name: medName,
-            dosage,
-            price,
-          }),
-        });
-
-        if (cartRes.ok) {
-          if (socket) {
-            socket.emit('add-to-cart', {
-              roomId: appointmentId,
-              item: newItem,
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to add live to patient cart:', err);
-      }
-    }
-
-    setPrescriptionMedicines([...prescriptionMedicines, newItem]);
-    setMedSearch('');
-    setSelectedMed(null);
-    setMedNotes('');
-  };
-
-  const handleRemoveMedicine = (idx: number) => {
-    setPrescriptionMedicines(prescriptionMedicines.filter((_, i) => i !== idx));
-  };
-
-  const handleSaveConsultation = async () => {
-    setSaveSuccess('');
-    setSavingLoading(true);
-
+  const save = useCallback(async () => {
+    const current = draftRef.current;
+    if (!current || !dirty.current) return;
+    dirty.current = false;
+    setSaveState('saving');
     try {
-      const payload: any = {
-        notes,
-        privateDoctorNotes: privateNotes,
-        diagnosis,
-      };
-
-      if (prescriptionMedicines.length > 0) {
-        payload.prescriptionData = {
-          medicines: prescriptionMedicines,
-          dietInstructions,
-          lifestyleAdvice,
-        };
-      }
-
-      const res = await fetch(`/api/doctor/consultations/${appointmentId}`, {
+      const body = completed
+        ? { privateDoctorNotes: current.privateDoctorNotes }
+        : {
+            diagnosis: current.diagnosis,
+            notes: current.notes,
+            dietInstructions: current.dietInstructions,
+            lifestyleAdvice: current.lifestyleAdvice,
+            medicines: current.medicines,
+            privateDoctorNotes: current.privateDoctorNotes,
+          };
+      const res = await fetch(`/api/consultations/${id}/report`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
-
-      if (res.ok) {
-        setSaveSuccess('Consultation saved and e-prescription published successfully!');
-        setTimeout(() => {
-          router.push('/doctor/dashboard');
-        }, 2000);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        dirty.current = true;
+        setSaveState('error');
+        setSaveError(json.error || 'Could not save.');
+        return;
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSavingLoading(false);
+      setSaveState('saved');
+      setSaveError('');
+    } catch {
+      dirty.current = true;
+      setSaveState('error');
+      setSaveError('You are offline. Changes will be saved when the connection returns.');
     }
+  }, [id, completed]);
+
+  // Debounced autosave; retry failed saves every few seconds
+  const update = (patch: Partial<Report>) => {
+    setDraft((d) => {
+      const next = { ...(d as Report), ...patch };
+      draftRef.current = next;
+      return next;
+    });
+    dirty.current = true;
+    setSaveState('saving');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(save, 900);
+  };
+  useEffect(() => {
+    if (saveState !== 'error') return;
+    const t = setTimeout(save, 4000);
+    return () => clearTimeout(t);
+  }, [saveState, save]);
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (dirty.current) {
+        save();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [save]);
+
+  const catalogTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchCatalog = useCallback((q: string) => {
+    if (catalogTimer.current) clearTimeout(catalogTimer.current);
+    catalogTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/consultations/medicines?q=${encodeURIComponent(q)}`);
+        if (res.ok) setCatalog((await res.json()).medicines || []);
+      } catch {}
+    }, 250);
+  }, []);
+
+  const setMed = (i: number, patch: Partial<MedicineItem>) => {
+    if (!draft) return;
+    const meds = draft.medicines.map((m, idx) => (idx === i ? { ...m, ...patch } : m));
+    update({ medicines: meds });
   };
 
-  const handleScheduleFollowup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!followupDate) return;
-
-    setSchedulingFollowup(true);
-    setFollowupSuccess('');
-
+  const complete = async () => {
+    setCompleteError('');
+    if (!confirm('Complete this consultation? The summary and prescription will be shared with the patient and can no longer be edited.')) return;
+    setCompleting(true);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    await save();
     try {
-      const res = await fetch('/api/doctor/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId: data.appointment.patientId,
-          scheduledAt: followupDate,
-          type: followupType,
-        }),
-      });
-
-      if (res.ok) {
-        setFollowupSuccess('Follow-up consultation successfully booked! Email notifications dispatched.');
-        setFollowupDate('');
-      } else {
-        const errJson = await res.json();
-        setFollowupSuccess(`Error: ${errJson.error || 'Failed to schedule follow-up.'}`);
-      }
-    } catch (err) {
-      setFollowupSuccess('Failed to connect to appointments scheduling API.');
+      const res = await fetch(`/api/consultations/${id}/complete`, { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) setCompleteError(json.error || 'Could not complete the consultation.');
+      else room.call.leave();
     } finally {
-      setSchedulingFollowup(false);
+      setCompleting(false);
     }
   };
 
-  if (loading) {
+  if (room.loadError) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-primary-800 bg-cream">
-        <Loader2 className="w-8 h-8 animate-spin mr-2" /> Loading video consultation workspace...
+      <div className="mx-auto max-w-lg rounded-3xl border border-line bg-white p-8 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-red-500" />
+        <p className="mt-3 font-semibold text-ink">{room.loadError}</p>
+        <Link href="/doctor/dashboard" className="mt-5 inline-block text-sm font-semibold text-forest hover:underline">
+          Back to today&apos;s queue
+        </Link>
+      </div>
+    );
+  }
+  if (!data || !draft) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-24 text-ink-muted">
+        <Loader2 className="h-5 w-5 animate-spin" /> Opening consultation room…
       </div>
     );
   }
 
-  const patient = data.appointment.patient || {};
-  const patientName = patient.user?.name || 'Patient';
-  const history = data.patient360 || {};
-  const isMeetingEnded = data?.appointment?.status === 'COMPLETED' || isExpired;
-
-  const filteredCatalog = catalog.filter((m) =>
-    m.name.toLowerCase().includes(medSearch.toLowerCase())
-  );
+  const ctx = data.patientContext;
+  const sharedLocked = completed || !active;
 
   return (
-    <div className="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6 h-[85vh] overflow-hidden font-sans text-slate-800" id="consultation-room">
-      
-      {/* Left Column: Direct Embedded Video Stream & Live Chat (7 cols) */}
-      <section className="lg:col-span-7 flex flex-col justify-between h-full bg-slate-900 border border-slate-880 rounded-2xl overflow-hidden shadow-2xl relative">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-600 to-gold-600 z-10"></div>
-
-        {/* Video Header */}
-        <div className="bg-slate-950 p-4 border-b border-slate-850 flex justify-between items-center text-white z-10">
-          <div className="flex items-center space-x-2">
-            <Video className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-display font-bold text-xs sm:text-sm">AyurCare Live Video Consultation</h3>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-bold text-gold-400 bg-gold-950/60 px-3 py-1 rounded-full border border-gold-800/40 flex items-center">
-              <Clock className="w-3.5 h-3.5 mr-1" /> Window: {timeLeftStr}
+    <div className="mx-auto max-w-[1400px] space-y-5" id="doctor-consultation-room">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link href="/doctor/dashboard" className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
+            <ArrowLeft className="h-4 w-4" /> Today&apos;s queue
+          </Link>
+          <h1 className="mt-1 font-display text-3xl font-semibold text-ink">{ctx?.name || data.appointment.patient.name}</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            {data.appointment.type.toLowerCase()} consultation · {fmt(data.appointment.scheduledAt)} IST
+            {ctx?.forFamilyMember && ` · ${ctx.forFamilyMember.relation} of ${ctx.forFamilyMember.bookedBy}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {room.connectionLost && (
+            <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+              <WifiOff className="h-3.5 w-3.5" /> Reconnecting to server…
             </span>
-          </div>
-        </div>
-
-        {/* Embedded Video Feed Container */}
-        <div className="flex-1 p-3 bg-slate-950 flex flex-col justify-between relative min-h-[50%]">
-          {!isExpired ? (
-            <div className="w-full h-full relative rounded-xl overflow-hidden border border-slate-800 shadow-inner">
-              <iframe
-                src={embedVideoUrl}
-                allow="camera; microphone; display-capture; autoplay; clipboard-write"
-                className="w-full h-full border-0 bg-slate-900"
-                title="AyurCare video consultation"
-              />
-            </div>
-          ) : (
-            <div className="h-full border border-slate-800 rounded-xl bg-slate-900/90 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-inner">
-              <Lock className="w-12 h-12 text-red-500" />
-              <h4 className="font-bold text-white text-base">1:30 Hour Consultation Window Expired</h4>
-              <p className="text-xs text-slate-400 max-w-sm">
-                The scheduled time limit for this consultation has concluded. Please save and publish your final report.
-              </p>
-            </div>
           )}
-        </div>
-
-        {/* Live Chat Panel */}
-        <div className="h-[35%] flex flex-col justify-between bg-slate-900 border-t border-slate-850 p-4">
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar">
-            {messages.map((msg, idx) => {
-              if (msg.system) {
-                return (
-                  <div key={idx} className="text-center text-[10px] text-slate-500 font-bold bg-slate-950/20 py-1 rounded">
-                    {msg.message}
-                  </div>
-                );
-              }
-              const isDoctor = msg.senderRole === 'DOCTOR';
-              return (
-                <div key={idx} className={`flex ${isDoctor ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-xl p-3 text-xs font-semibold leading-relaxed ${
-                    isDoctor 
-                      ? 'bg-primary-850 text-white rounded-tr-none border border-primary-800' 
-                      : 'bg-slate-955 text-slate-300 rounded-tl-none border border-slate-855'
-                  }`}>
-                    <span className="block text-[9px] text-slate-500 font-bold uppercase mb-1">{msg.senderName}</span>
-                    <p>{msg.message}</p>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <form onSubmit={handleSendChat} className="flex items-center space-x-2 border-t border-slate-800 pt-3 mt-2">
-            <input
-              type="text"
-              required
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Send live chat to patient..."
-              className="flex-grow px-3 py-2 bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 placeholder-slate-500"
-            />
-            <button
-              type="submit"
-              className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg cursor-pointer"
+          {completed ? (
+            <Link
+              href={`/consultations/${id}/report`}
+              className="inline-flex items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-semibold text-white hover:bg-forest-deep"
             >
-              <Send className="w-3.5 h-3.5" />
+              <FileText className="h-4 w-4" /> View reports
+            </Link>
+          ) : (
+            <button
+              onClick={complete}
+              disabled={completing || !active}
+              className="inline-flex items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-semibold text-white hover:bg-forest-deep disabled:opacity-50 cursor-pointer"
+            >
+              {completing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Complete consultation
             </button>
-          </form>
-        </div>
-      </section>
-
-      {/* Right Column: Drawer tabs (5 cols) */}
-      <section className="lg:col-span-5 bg-white border border-slate-100 rounded-2xl flex flex-col overflow-hidden shadow-2xl h-full">
-        {/* Navigation Tabs */}
-        <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`py-3 flex items-center justify-center space-x-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'history' ? 'border-primary-600 text-primary-800 bg-white' : 'border-transparent hover:text-slate-800'
-            }`}
-          >
-            <User className="w-4 h-4" /> <span>Patient 360</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('prescription')}
-            className={`py-3 flex items-center justify-center space-x-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'prescription' ? 'border-primary-600 text-primary-800 bg-white' : 'border-transparent hover:text-slate-800'
-            }`}
-          >
-            <ClipboardList className="w-4 h-4" /> <span>Prescribe & Cart</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`py-3 flex items-center justify-center space-x-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'notes' ? 'border-primary-600 text-primary-800 bg-white' : 'border-transparent hover:text-slate-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" /> <span>Report & Follow-up</span>
-          </button>
-        </div>
-
-        {/* Tab contents (scrollable container) */}
-        <div className="flex-1 p-6 overflow-y-auto max-h-[75vh]">
-          {saveSuccess && (
-            <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-lg text-xs font-bold text-center mb-4 flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 mr-1.5" /> {saveSuccess}
-            </div>
           )}
+        </div>
+      </div>
 
-          {/* TAB 1: Patient 360 View */}
-          {activeTab === 'history' && (
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Prakriti Analysis</h4>
-                <div className="bg-primary-50/50 border border-primary-100 rounded-xl p-4 flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2.5 text-primary-900 font-bold">
-                    <Heart className="w-5 h-5 text-primary-600 fill-primary-600" />
-                    <span>Dominant Dosha Baseline</span>
-                  </div>
-                  <span className="bg-primary-600 text-white font-extrabold px-3 py-1 rounded-lg text-xs uppercase tracking-wide">
-                    {history.profile?.doshaType || 'Not Evaluated'}
-                  </span>
-                </div>
-              </div>
+      {completeError && (
+        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {completeError}
+        </div>
+      )}
+      {completed && (
+        <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          This consultation is complete. The summary and prescription are in the patient&apos;s records. Your private notes stay editable.
+        </div>
+      )}
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Medical Intake Details</h4>
-                <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-2.5 text-xs">
-                  <div><strong>Allergies:</strong> {history.profile?.allergies || 'None reported'}</div>
-                  <div><strong>Chronic Conditions:</strong> {history.profile?.chronicConditions || 'None reported'}</div>
-                  <div><strong>Gender:</strong> {history.profile?.gender || 'N/A'} | <strong>Blood Group:</strong> {history.profile?.bloodGroup || 'N/A'}</div>
-                </div>
-              </div>
+      <div className="grid gap-5 xl:grid-cols-12">
+        {/* Call + chat */}
+        <div className="space-y-5 xl:col-span-7">
+          <CallStage
+            type={data.appointment.type}
+            peerName={ctx?.name || data.appointment.patient.name}
+            peerRoleLabel="Patient"
+            peer={room.peer}
+            windowOpen={room.windowOpen}
+            opensAt={data.window.opensAt}
+            active={active}
+            call={room.call}
+          />
+          <ChatPanel
+            className={data.appointment.type === 'CHAT' ? 'h-[560px]' : 'h-[380px]'}
+            messages={room.messages}
+            myId={data.me.id}
+            peerName={data.appointment.patient.name}
+            canSend={active}
+            closedReason={completed ? 'The consultation is complete, so chat is closed.' : 'Chat is not available for this appointment.'}
+            onSend={room.sendMessage}
+          />
+        </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Symptom Summary (AI Bot)</h4>
-                <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 text-xs italic text-slate-550 leading-relaxed">
-                  {history.aiSessions?.[0]?.summary 
-                    ? `"${history.aiSessions[0].summary}"` 
-                    : 'No preliminary symptom triage logged.'}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Past Consultations</h4>
-                {history.appointments?.length <= 1 ? (
-                  <div className="text-[11px] text-slate-400 italic">First consult on this platform.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {history.appointments.map((appt: any, idx: number) => {
-                      if (appt.id === appointmentId) return null;
-                      return (
-                        <div key={idx} className="border border-slate-100 rounded-lg p-3 text-xs hover:bg-slate-50">
-                          <div className="flex justify-between font-bold text-slate-800">
-                            <span>Dr. {appt.doctor?.user?.name}</span>
-                            <span>{new Date(appt.scheduledAt).toLocaleDateString()}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-1 italic">Diagnosis: {appt.consultation?.diagnosis || 'No record'}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+        {/* Clinical workspace */}
+        <div className="xl:col-span-5">
+          <div className="sticky top-4 rounded-3xl border border-line bg-white">
+            <div className="flex gap-1 overflow-x-auto border-b border-line p-2" role="tablist">
+              {(
+                [
+                  ['rx', 'Prescription', Pill],
+                  ['summary', 'Summary', ClipboardList],
+                  ['private', 'My notes', Lock],
+                  ['history', 'History', History],
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition cursor-pointer ${
+                    tab === key ? 'bg-forest text-white' : 'text-ink-muted hover:bg-bg hover:text-ink'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
             </div>
-          )}
 
-          {/* TAB 2: E-Prescription Builder & Live Cart Pusher */}
-          {activeTab === 'prescription' && (
-            <div className="space-y-6">
-              {isMeetingEnded && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-bold p-3.5 rounded-xl flex items-center">
-                  ⚠️ Cart changes locked (consultation ended).
-                </div>
+            {/* Save status */}
+            <div className="flex items-center justify-between px-5 pt-3 text-xs">
+              <span className="text-ink-muted">
+                {tab === 'private'
+                  ? 'Only you can see these notes. They appear here on this patient’s next visit.'
+                  : tab === 'history'
+                    ? 'Previous visits and records'
+                    : sharedLocked
+                      ? 'Read-only'
+                      : 'The patient sees this update live.'}
+              </span>
+              {tab !== 'history' && (
+                <span className={saveState === 'error' ? 'text-red-600' : 'text-ink-muted'}>
+                  {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Not saved' : ''}
+                </span>
               )}
+            </div>
+            {saveState === 'error' && saveError && <p className="px-5 pt-1 text-xs text-red-600">{saveError}</p>}
 
-              {/* Added Medicines */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Prescribed Medicines</h4>
-                {prescriptionMedicines.length === 0 ? (
-                  <div className="text-[11px] text-slate-400 italic">No medicines added to Rx. Use search below.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {prescriptionMedicines.map((med, idx) => (
-                      <div key={idx} className="bg-slate-50 border border-slate-150 rounded-lg p-3 flex justify-between items-start gap-4">
-                        <div className="text-xs space-y-0.5 font-semibold">
-                          <strong className="text-primary-850 font-bold block">{med.name}</strong>
-                          <div className="text-slate-655">{med.dosage} • {med.frequency} • {med.duration}</div>
-                          <div className="text-[10px] text-slate-500 font-bold">Anupana: {med.anupana}</div>
-                          {med.notes && <p className="text-[10px] text-slate-400 mt-1 italic">"{med.notes}"</p>}
-                        </div>
-                        {!isMeetingEnded && (
+            <div className="max-h-[calc(100dvh-14rem)] overflow-y-auto p-5">
+              {tab === 'rx' && (
+                <div className="space-y-4">
+                  {draft.medicines.length === 0 && (
+                    <p className="rounded-2xl bg-bg p-4 text-sm text-ink-muted">No medicines yet. Add the first one below.</p>
+                  )}
+                  <datalist id="catalog-names">
+                    {catalog.map((c) => (
+                      <option key={c.name} value={c.name} />
+                    ))}
+                  </datalist>
+                  <datalist id="freq-list">{FREQUENCIES.map((v) => <option key={v} value={v} />)}</datalist>
+                  <datalist id="timing-list">{TIMINGS.map((v) => <option key={v} value={v} />)}</datalist>
+                  <datalist id="anupana-list">{ANUPANAS.map((v) => <option key={v} value={v} />)}</datalist>
+                  <datalist id="duration-list">{DURATIONS.map((v) => <option key={v} value={v} />)}</datalist>
+
+                  {draft.medicines.map((m, i) => (
+                    <div key={i} className="space-y-2.5 rounded-2xl border border-line p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-forest">{i + 1}</span>
+                        <input
+                          list="catalog-names"
+                          aria-label="Medicine name"
+                          placeholder="Medicine or formulation"
+                          value={m.name}
+                          disabled={sharedLocked}
+                          onFocus={() => searchCatalog(m.name)}
+                          onChange={(e) => {
+                            const name = e.target.value;
+                            const match = catalog.find((c) => c.name.toLowerCase() === name.toLowerCase());
+                            setMed(i, match ? { name, dosage: m.dosage || match.dosage, anupana: m.anupana || match.anupana } : { name });
+                            searchCatalog(name);
+                          }}
+                          className={`${input} font-semibold`}
+                        />
+                        {!sharedLocked && (
                           <button
-                            onClick={() => handleRemoveMedicine(idx)}
-                            className="text-xs text-red-500 hover:underline font-bold"
+                            type="button"
+                            onClick={() => update({ medicines: draft.medicines.filter((_, idx) => idx !== i) })}
+                            aria-label={`Remove medicine ${i + 1}`}
+                            className="rounded-lg p-2 text-ink-muted hover:bg-red-50 hover:text-red-600 cursor-pointer"
                           >
-                            Remove
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         )}
                       </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input aria-label="Dose" placeholder="Dose (e.g. 1 tablet, 3 g)" value={m.dosage} disabled={sharedLocked} onChange={(e) => setMed(i, { dosage: e.target.value })} className={input} />
+                        <input list="freq-list" aria-label="Frequency" placeholder="When (e.g. 1-0-1)" value={m.frequency} disabled={sharedLocked} onChange={(e) => setMed(i, { frequency: e.target.value })} className={input} />
+                        <input list="timing-list" aria-label="Timing" placeholder="Timing" value={m.timing} disabled={sharedLocked} onChange={(e) => setMed(i, { timing: e.target.value })} className={input} />
+                        <input list="anupana-list" aria-label="Take with" placeholder="Take with (Anupana)" value={m.anupana} disabled={sharedLocked} onChange={(e) => setMed(i, { anupana: e.target.value })} className={input} />
+                        <input list="duration-list" aria-label="Duration" placeholder="Duration" value={m.duration} disabled={sharedLocked} onChange={(e) => setMed(i, { duration: e.target.value })} className={input} />
+                        <input aria-label="Notes" placeholder="Notes (optional)" value={m.notes} disabled={sharedLocked} onChange={(e) => setMed(i, { notes: e.target.value })} className={input} />
+                      </div>
+                    </div>
+                  ))}
+
+                  {!sharedLocked && (
+                    <button
+                      type="button"
+                      onClick={() => update({ medicines: [...draft.medicines, { ...EMPTY_MED }] })}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-forest/40 py-3 text-sm font-semibold text-forest hover:bg-sage/40 cursor-pointer"
+                    >
+                      <Plus className="h-4 w-4" /> Add medicine
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {tab === 'summary' && (
+                <div className="space-y-4">
+                  {(
+                    [
+                      ['diagnosis', 'Assessment', 'Your assessment in plain words, e.g. Vata aggravation with weak Agni.'],
+                      ['notes', 'Discussion & recommendations', 'What you discussed, what you suggest, and any follow-up advice.'],
+                      ['dietInstructions', 'Diet (Pathya-Apathya)', 'Foods to favour and to avoid.'],
+                      ['lifestyleAdvice', 'Lifestyle & routine', 'Sleep, exercise, yoga, pranayama, daily routine.'],
+                    ] as const
+                  ).map(([key, label, hint]) => (
+                    <div key={key}>
+                      <label htmlFor={`f-${key}`} className="text-sm font-semibold text-ink">
+                        {label}
+                      </label>
+                      <textarea
+                        id={`f-${key}`}
+                        value={draft[key]}
+                        placeholder={hint}
+                        disabled={sharedLocked}
+                        onChange={(e) => update({ [key]: e.target.value } as Partial<Report>)}
+                        className={`${textarea} mt-1.5`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'private' && (
+                <div className="space-y-3">
+                  <label htmlFor="f-private" className="text-sm font-semibold text-ink">
+                    Your summary of this patient
+                  </label>
+                  <textarea
+                    id="f-private"
+                    value={draft.privateDoctorNotes || ''}
+                    placeholder="In your own words: history, observations (Nadi, Jihva, Prakriti/Vikriti), what you tried, what to check next time…"
+                    onChange={(e) => update({ privateDoctorNotes: e.target.value })}
+                    className={`${textarea} min-h-[320px]`}
+                  />
+                </div>
+              )}
+
+              {tab === 'history' && ctx && (
+                <div className="space-y-5 text-sm">
+                  <div className="grid grid-cols-2 gap-3">
+                    {(
+                      [
+                        ['Age', ctx.age != null ? `${ctx.age} years` : null],
+                        ['Gender', ctx.gender],
+                        ['Blood group', ctx.bloodGroup],
+                        ['Prakriti', ctx.prakriti],
+                      ] as const
+                    ).map(([k, v]) => (
+                      <div key={k} className="rounded-xl bg-bg p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-ink-muted">{k}</p>
+                        <p className="font-semibold text-ink">{v || 'Not recorded'}</p>
+                      </div>
                     ))}
                   </div>
-                )}
-              </div>
+                  {(ctx.allergies || ctx.chronicConditions) && (
+                    <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                      {ctx.allergies && <p><strong>Allergies:</strong> {ctx.allergies}</p>}
+                      {ctx.chronicConditions && <p><strong>Chronic conditions:</strong> {ctx.chronicConditions}</p>}
+                    </div>
+                  )}
 
-              {/* Add Medicine form */}
-              {!isMeetingEnded && (
-                <div className="border border-slate-150 rounded-xl p-4 space-y-3 bg-slate-50/50">
-                  <h5 className="text-xs font-bold text-primary-800 uppercase tracking-wider">Search & Add Herb</h5>
-                  
-                  {/* Catalog Search */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={medSearch}
-                      onChange={(e) => {
-                        setMedSearch(e.target.value);
-                        setSelectedMed(null);
-                      }}
-                      placeholder="Search Ashwagandha, Triphala..."
-                      className="w-full px-3 py-1.5 rounded border border-slate-200 bg-white text-xs"
-                    />
-                    {medSearch && !selectedMed && filteredCatalog.length > 0 && (
-                      <div className="absolute left-0 right-0 bg-white border border-slate-200 mt-1 rounded shadow-lg z-20 max-h-[120px] overflow-y-auto divide-y divide-slate-100 text-xs">
-                        {filteredCatalog.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedMed(item);
-                              setMedSearch(item.name);
-                              setDosage(item.dosage || '1 tablet');
-                              setAnupana(item.anupana || 'Warm water');
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-100"
-                          >
-                            {item.name} {item.prescriptionOnly ? '(Rx)' : ''}
-                          </button>
+                  <div>
+                    <p className="mb-2 font-semibold text-ink">Previous consultations</p>
+                    {ctx.previousVisits.length === 0 ? (
+                      <p className="text-ink-muted">This is the patient&apos;s first completed consultation on AyurCare.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {ctx.previousVisits.map((v) => (
+                          <div key={v.id} className={`rounded-2xl border p-4 ${v.withMe ? 'border-forest/30 bg-sage/40' : 'border-line'}`}>
+                            <p className="text-xs text-ink-muted">
+                              {fmt(v.date)} · {v.type.toLowerCase()} · {v.withMe ? 'with you' : `Dr. ${v.doctorName.replace(/^Dr\.?\s*/i, '')}`}
+                            </p>
+                            {v.diagnosis && <p className="mt-1.5"><strong>Assessment:</strong> {v.diagnosis}</p>}
+                            {v.medicines.length > 0 && <p className="mt-1"><strong>Medicines:</strong> {v.medicines.join(', ')}</p>}
+                            {v.withMe && v.privateNotes && (
+                              <div className="mt-2 rounded-xl bg-white p-3">
+                                <p className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-forest">
+                                  <Lock className="h-3 w-3" /> Your private notes
+                                </p>
+                                <p className="mt-1 whitespace-pre-wrap">{v.privateNotes}</p>
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label htmlFor="med-dose" className="block text-[10px] text-slate-500 font-bold mb-1 uppercase">Dosage</label>
-                      <input
-                        id="med-dose"
-                        type="text"
-                        value={dosage}
-                        onChange={(e) => setDosage(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-slate-200 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="med-anupana" className="block text-[10px] text-slate-500 font-bold mb-1 uppercase">Anupana (Vehicle)</label>
-                      <input
-                        id="med-anupana"
-                        type="text"
-                        value={anupana}
-                        onChange={(e) => setAnupana(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-slate-200 bg-white"
-                      />
-                    </div>
+                  <div>
+                    <p className="mb-2 font-semibold text-ink">Lab reports</p>
+                    {ctx.labReports.length === 0 ? (
+                      <p className="text-ink-muted">No lab reports uploaded.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {ctx.labReports.map((r) => (
+                          <li key={r.id} className="flex justify-between gap-3 rounded-xl bg-bg px-3 py-2">
+                            <span className="truncate">{r.description || 'Report'}</span>
+                            <span className="shrink-0 text-ink-muted">{new Date(r.uploadedAt).toLocaleDateString('en-IN')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label htmlFor="med-freq" className="block text-[10px] text-slate-500 font-bold mb-1 uppercase">Frequency</label>
-                      <input
-                        id="med-freq"
-                        type="text"
-                        value={frequency}
-                        onChange={(e) => setFrequency(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-slate-200 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="med-dur" className="block text-[10px] text-slate-500 font-bold mb-1 uppercase">Duration</label>
-                      <input
-                        id="med-dur"
-                        type="text"
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-slate-200 bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-xs">
-                    <label htmlFor="med-notes" className="block text-[10px] text-slate-500 font-bold mb-1 uppercase">Special Instructions</label>
-                    <input
-                      id="med-notes"
-                      type="text"
-                      value={medNotes}
-                      onChange={(e) => setMedNotes(e.target.value)}
-                      placeholder="Take after food..."
-                      className="w-full px-2 py-1 rounded border border-slate-200 bg-white"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddMedicine}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs transition cursor-pointer flex items-center justify-center"
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" /> Prescribe & Add to Patient's Cart Live
-                  </button>
                 </div>
               )}
-
-              {/* Instructions */}
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="diet-inst" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dietary Advice (Pathya-Apathya)</label>
-                  <textarea
-                    id="diet-inst"
-                    rows={2}
-                    disabled={isMeetingEnded}
-                    value={dietInstructions}
-                    onChange={(e) => setDietInstructions(e.target.value)}
-                    placeholder="Avoid cold/dry food, drink warm ginger tea..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="life-advice" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lifestyle Advice (Vihara)</label>
-                  <textarea
-                    id="life-advice"
-                    rows={2}
-                    disabled={isMeetingEnded}
-                    value={lifestyleAdvice}
-                    onChange={(e) => setLifestyleAdvice(e.target.value)}
-                    placeholder="Yoga / Pranayama daily, avoid sleeping during day..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
             </div>
-          )}
-
-          {/* TAB 3: Clinical Notes & Follow-up Meet Scheduler */}
-          {activeTab === 'notes' && (
-            <div className="space-y-6">
-              {/* Consultation report */}
-              <div className="space-y-5 border-b pb-6 border-slate-100">
-                <h4 className="text-xs font-bold text-primary-800 uppercase tracking-wider">Write Live Consultation Report</h4>
-                
-                <div>
-                  <label htmlFor="diagn-inp" className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Primary Diagnosis / Ailment</label>
-                  <input
-                    id="diagn-inp"
-                    type="text"
-                    required
-                    disabled={isMeetingEnded}
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                    placeholder="e.g. Gastritis (Amlapitta), Arthritis (Sandhivata)"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs disabled:bg-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="notes-inp" className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Patient Consultation Summary (Shared)</label>
-                  <textarea
-                    id="notes-inp"
-                    rows={3}
-                    disabled={isMeetingEnded}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Shared consultation summary notes..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs disabled:bg-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="priv-notes-inp" className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Private Clinical Notes (Doctor Only)</label>
-                  <textarea
-                    id="priv-notes-inp"
-                    rows={3}
-                    disabled={isMeetingEnded}
-                    value={privateNotes}
-                    onChange={(e) => setPrivateNotes(e.target.value)}
-                    placeholder="Hidden clinical notes not visible to patient..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs disabled:bg-slate-100"
-                  />
-                </div>
-              </div>
-
-              {/* Follow-up scheduler */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-primary-800 uppercase tracking-wider flex items-center">
-                  <Calendar className="w-4 h-4 mr-1.5" /> Book Follow-up Consultation
-                </h4>
-                
-                {followupSuccess && (
-                  <div className={`p-3.5 rounded-xl text-xs font-semibold border ${
-                    followupSuccess.includes('Error') 
-                      ? 'bg-red-50 border-red-150 text-red-800' 
-                      : 'bg-emerald-50 border-emerald-150 text-emerald-800'
-                  }`}>
-                    {followupSuccess}
-                  </div>
-                )}
-
-                <form onSubmit={handleScheduleFollowup} className="space-y-3.5 bg-slate-50 border border-slate-150 p-4 rounded-2xl">
-                  <div>
-                    <label htmlFor="followup-time" className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Scheduled Day & Time</label>
-                    <input
-                      id="followup-time"
-                      type="datetime-local"
-                      required
-                      value={followupDate}
-                      onChange={(e) => setFollowupDate(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-250 bg-white text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="followup-type" className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Consultation Type</label>
-                    <select
-                      id="followup-type"
-                      value={followupType}
-                      onChange={(e) => setFollowupType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-250 bg-white text-xs font-semibold"
-                    >
-                      <option value="VIDEO">Video Consultation</option>
-                      <option value="AUDIO">Audio Call</option>
-                      <option value="CHAT">Text Chat</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={schedulingFollowup || !followupDate}
-                    className="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center cursor-pointer"
-                  >
-                    {schedulingFollowup && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />}
-                    Book Follow-up Meeting
-                  </button>
-                </form>
-              </div>
-
-            </div>
-          )}
+          </div>
         </div>
-
-        {/* Global Save action footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-          <button
-            onClick={handleSaveConsultation}
-            disabled={savingLoading || !diagnosis || isMeetingEnded}
-            className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-xs shadow-md transition disabled:opacity-50 flex items-center cursor-pointer"
-          >
-            {savingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
-            {isMeetingEnded ? 'Consultation Saved & Completed' : 'Publish Consultation & E-Rx'}
-          </button>
-        </div>
-      </section>
-
+      </div>
     </div>
   );
 }

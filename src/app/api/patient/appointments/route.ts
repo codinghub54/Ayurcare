@@ -29,7 +29,8 @@ export async function GET() {
           },
         },
         familyMember: true,
-        consultation: true,
+        // Never send the doctor's private notes to the patient
+        consultation: { select: { id: true, diagnosis: true, notes: true, startedAt: true, endedAt: true } },
       },
       orderBy: { scheduledAt: 'asc' },
     });

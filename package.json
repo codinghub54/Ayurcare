@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "node server.js",
     "postinstall": "prisma generate",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/ensure-db-tables.js && next build",
     "start": "NODE_ENV=production node server.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:ensure": "node scripts/ensure-db-tables.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.0",

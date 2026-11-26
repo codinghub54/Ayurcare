@@ -483,7 +483,7 @@ export default function PatientDashboard() {
   const nextAppt = appointments.find((appt) => {
     if (appt.status !== 'CONFIRMED') return false;
     const scheduledTime = new Date(appt.scheduledAt).getTime();
-    const expiryTime = scheduledTime + (90 * 60 * 1000); // 90 min window
+    const expiryTime = scheduledTime + (240 * 60 * 1000); // room stays open 4 hours after the start time
     return Date.now() < expiryTime;
   });
 
@@ -551,7 +551,7 @@ export default function PatientDashboard() {
                   href={`/patient/consultations/${nextAppt.id}`}
                   className="px-5 py-3 bg-gold-600 hover:bg-gold-700 text-primary-850 font-bold rounded-lg transition duration-200 shadow-md text-xs flex items-center justify-center z-10 cursor-pointer text-slate-900 glow-gold"
                 >
-                  <Video className="w-4 h-4 mr-2" /> Join Video Consultation Room
+                  <Video className="w-4 h-4 mr-2" /> Open consultation room
                 </Link>
               </div>
             )}
@@ -862,17 +862,21 @@ export default function PatientDashboard() {
                                 <div className="mt-4 space-y-2 pl-6 border-l-2 border-primary-100">
                                   {medicines.map((med: any, idx: number) => (
                                     <div key={idx} className="text-xs font-semibold text-slate-600">
-                                      • <strong className="text-primary-850">{med.name}</strong> - {med.dosage} ({med.frequency}, Anupana: {med.anupana})
+                                      • <strong className="text-primary-850">{med.name}</strong>
+                                      {[med.dosage, med.frequency, med.timing, med.anupana && `with ${med.anupana}`, med.duration].filter(Boolean).length > 0 &&
+                                        ` - ${[med.dosage, med.frequency, med.timing, med.anupana && `with ${med.anupana}`, med.duration].filter(Boolean).join(', ')}`}
                                     </div>
                                   ))}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => alert(`Downloading PDF copy: ${pres.pdfUrl}`)}
-                                className="px-4 py-2 border border-slate-200 hover:bg-slate-55 text-xs font-semibold text-slate-700 rounded-lg cursor-pointer bg-white"
-                              >
-                                Download PDF
-                              </button>
+                              {pres.consultation?.appointmentId && (
+                                <Link
+                                  href={`/consultations/${pres.consultation.appointmentId}/report`}
+                                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 rounded-lg cursor-pointer bg-white"
+                                >
+                                  View &amp; print
+                                </Link>
+                              )}
                             </div>
                           );
                         })}

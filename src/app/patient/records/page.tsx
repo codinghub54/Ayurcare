@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Loader2, FileText, Download, UploadCloud, ShieldCheck, Plus, Inbox, ClipboardList, CheckCircle2 } from 'lucide-react';
 
 export default function MyHealthRecords() {
@@ -126,17 +127,21 @@ export default function MyHealthRecords() {
                         <div className="space-y-1.5 mt-3">
                           {medicines.map((med: any, idx: number) => (
                             <div key={idx} className="text-xs font-semibold text-slate-600">
-                              • <strong className="text-primary-800">{med.name}</strong> - {med.dosage} ({med.frequency}, Anupana: {med.anupana})
+                              • <strong className="text-primary-800">{med.name}</strong>
+                              {[med.dosage, med.frequency, med.timing, med.anupana && `with ${med.anupana}`, med.duration].filter(Boolean).length > 0 &&
+                                ` - ${[med.dosage, med.frequency, med.timing, med.anupana && `with ${med.anupana}`, med.duration].filter(Boolean).join(', ')}`}
                             </div>
                           ))}
                         </div>
                       </div>
-                      <button
-                        onClick={() => alert(`Downloading PDF e-prescription: ${pres.pdfUrl}`)}
-                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg flex items-center cursor-pointer shadow-sm"
-                      >
-                        <Download className="w-4 h-4 mr-2" /> PDF Copy
-                      </button>
+                      {pres.consultation?.appointmentId && (
+                        <Link
+                          href={`/consultations/${pres.consultation.appointmentId}/report`}
+                          className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg flex items-center cursor-pointer shadow-sm"
+                        >
+                          <Download className="w-4 h-4 mr-2" /> View &amp; print
+                        </Link>
+                      )}
                     </div>
                   );
                 })}
@@ -167,12 +172,19 @@ export default function MyHealthRecords() {
                         Source: {report.uploadedBy}
                       </span>
                     </div>
-                    <button
-                      onClick={() => alert(`Opening report file: ${report.fileUrl}`)}
-                      className="w-full py-2 border border-slate-200 hover:bg-white text-slate-700 text-[10px] font-bold rounded-lg transition text-center shadow-sm cursor-pointer"
-                    >
-                      View Attached File
-                    </button>
+                    {report.fileUrl ? (
+                      <a
+                        href={report.fileUrl}
+                        download={report.description || 'medical-report'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full py-2 border border-slate-200 hover:bg-white text-slate-700 text-[10px] font-bold rounded-lg transition text-center shadow-sm cursor-pointer"
+                      >
+                        Open attached file
+                      </a>
+                    ) : (
+                      <span className="block w-full py-2 text-center text-[10px] text-slate-400">No file attached</span>
+                    )}
                   </div>
                 ))}
               </div>

@@ -33,11 +33,11 @@ export async function GET() {
             appointments: {
               include: {
                 doctor: { include: { user: { select: { name: true } } } },
-                consultation: true,
+                consultation: { select: { id: true, diagnosis: true, notes: true, startedAt: true, endedAt: true } },
               },
             },
             labReports: true,
-            prescriptions: true,
+            prescriptions: { where: { status: { not: 'DRAFT' } } },
             aiChatSessions: {
               select: { id: true, summary: true, createdAt: true },
             },

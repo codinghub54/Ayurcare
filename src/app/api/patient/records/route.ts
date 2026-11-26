@@ -18,14 +18,16 @@ export async function GET() {
     const patient = await verifyPatient();
     if (!patient) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Drafts the doctor is still writing during a live consultation are not shown until completed
     const prescriptions = await prisma.prescription.findMany({
-      where: { patientId: patient.userId },
+      where: { patientId: patient.userId, status: { not: 'DRAFT' } },
       include: {
         doctor: {
           include: {
             user: { select: { name: true } },
           },
         },
+        consultation: { select: { appointmentId: true } },
       },
       orderBy: { assignedAt: 'desc' },
     });
@@ -46,7 +48,8 @@ export async function GET() {
             user: { select: { name: true } },
           },
         },
-        consultation: true,
+        // Never send the doctor's private notes to the patient
+        consultation: { select: { id: true, diagnosis: true, notes: true, startedAt: true, endedAt: true } },
       },
       orderBy: { scheduledAt: 'desc' },
     });

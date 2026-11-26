@@ -112,26 +112,47 @@ const TOOLS: ToolDef[] = [
 /* Tool implementations                                                */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_HOURS = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+/** Length of one bookable consultation slot. */
+export const SLOT_MINUTES = 60;
 
-function hoursFromAvailability(availability: string | null, date: Date): string[] {
-  if (!availability) return DEFAULT_HOURS;
+function toMinutes(hhmm: string): number | null {
+  const m = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(hhmm);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 24 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/**
+ * Slot start times for a weekday, built ONLY from the hours the doctor has
+ * published. A day with no hours has no slots (there are no default hours),
+ * and every slot must finish by the end of its range: 09:00-16:00 gives
+ * 09:00 ... 15:00, never 16:00 or later.
+ */
+export function slotsFromAvailability(availability: string | null, date: Date): string[] {
+  if (!availability) return [];
+  let recurring: Record<string, unknown> = {};
   try {
-    const recurring = JSON.parse(availability)?.recurring || {};
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
-    const ranges: string[] = recurring[weekday];
-    if (!Array.isArray(ranges) || ranges.length === 0) return DEFAULT_HOURS;
-    const out: string[] = [];
-    for (const range of ranges) {
-      const [start, end] = String(range).split('-');
-      const s = parseInt(start, 10);
-      const e = parseInt(end, 10);
-      for (let h = s; h < e; h++) out.push(`${String(h).padStart(2, '0')}:00`);
-    }
-    return out;
+    recurring = JSON.parse(availability)?.recurring || {};
   } catch {
-    return DEFAULT_HOURS;
+    return [];
   }
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+  const ranges = recurring[weekday];
+  if (!Array.isArray(ranges)) return [];
+
+  const out = new Set<string>();
+  for (const range of ranges) {
+    const [startRaw, endRaw] = String(range).split('-');
+    const start = toMinutes(startRaw || '');
+    const end = toMinutes(endRaw || '');
+    if (start === null || end === null || end <= start) continue;
+    for (let t = start; t + SLOT_MINUTES <= end; t += SLOT_MINUTES) {
+      out.add(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+    }
+  }
+  return [...out].sort();
 }
 
 function istDateString(d: Date) {
@@ -201,11 +222,18 @@ export async function getDoctorSlots(doctorId: string, date: string) {
   );
 
   const nowIst = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
-  const slots = hoursFromAvailability(doctor.availability, dayStart)
+  const slots = slotsFromAvailability(doctor.availability, dayStart)
     .filter((t) => !bookedTimes.has(t))
     .filter((t) => date !== today || t > nowIst);
 
-  return { doctorName: doctor.user.name, date, timezone: 'IST', feesInr: getConsultFees(doctor), openSlots: slots };
+  return {
+    doctorName: doctor.user.name,
+    date,
+    timezone: 'IST',
+    feesInr: getConsultFees(doctor),
+    openSlots: slots,
+    ...(slots.length === 0 && !doctor.availability ? { note: 'This doctor has not published consulting hours yet.' } : {}),
+  };
 }
 
 async function getMyAppointments(userId: string) {

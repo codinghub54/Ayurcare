@@ -137,6 +137,47 @@ model Appointment {
   payment        Payment?
   consultation   Consultation?
   reviews        Review[]
+  messages       ConsultationMessage[]
+  callSignals    CallSignal[]
+  presence       ConsultationPresence[]
+}
+
+// Chat messages exchanged in a consultation room (part of the medical record)
+model ConsultationMessage {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  senderId      String
+  senderRole    String      // "DOCTOR", "PATIENT", "SYSTEM"
+  body          String
+  createdAt     DateTime    @default(now())
+
+  @@index([appointmentId, createdAt])
+}
+
+// Short-lived WebRTC signalling messages (offer/answer/ICE) between the two participants
+model CallSignal {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  fromUserId    String
+  toUserId      String
+  kind          String      // "hello", "description", "candidate", "bye"
+  payload       String
+  createdAt     DateTime    @default(now())
+
+  @@index([appointmentId, toUserId, createdAt])
+}
+
+// Who is currently in a consultation room, and whether they have joined the call
+model ConsultationPresence {
+  appointmentId String
+  userId        String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  inCall        Boolean     @default(false)
+  lastSeenAt    DateTime    @default(now())
+
+  @@id([appointmentId, userId])
 }
 
 model Consultation {
