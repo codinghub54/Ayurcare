@@ -18,10 +18,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email, password, and portal role are required' }, { status: 400 });
     }
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    // Find user (emails are stored lowercase; older accounts may have mixed case)
+    const typed = String(email).trim();
+    const user =
+      (await prisma.user.findUnique({ where: { email: typed.toLowerCase() } })) ??
+      (await prisma.user.findFirst({ where: { email: { equals: typed, mode: 'insensitive' } } }));
 
     if (!user || user.role !== role) {
       // Keep error message generic to prevent enumeration but help UI routing if portal role mismatches

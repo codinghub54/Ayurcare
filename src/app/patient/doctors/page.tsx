@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Loader2, Search, Star, ShieldCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import BookingModal from '@/components/booking/BookingModal';
+import { getConsultFees, CONSULT_TYPES, CONSULT_TYPE_LABELS } from '@/lib/doctor-fees';
 
 type ConsultType = 'VIDEO' | 'AUDIO' | 'CHAT';
 
@@ -207,15 +208,23 @@ export default function FindAndBookDoctor() {
                 </div>
 
                 <div className="border-t border-slate-50 mt-6 pt-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Fee per consult</span>
-                    <strong className="text-xl font-extrabold text-slate-800">₹{profile.feePerConsult}</strong>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Consultation fees</span>
+                    {(() => {
+                      const fees = getConsultFees(profile);
+                      return CONSULT_TYPES.filter((t) => fees[t] !== null).map((t) => (
+                        <div key={t} className="flex items-center gap-2 text-xs text-slate-600">
+                          <span className="w-10">{CONSULT_TYPE_LABELS[t]}</span>
+                          <strong className="text-sm font-bold text-slate-800">₹{(fees[t] as number).toLocaleString('en-IN')}</strong>
+                        </div>
+                      ));
+                    })()}
                   </div>
                   <button
                     onClick={() => setSelectedDoctor(doc)}
                     className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg transition cursor-pointer"
                   >
-                    Select Slots
+                    Book
                   </button>
                 </div>
               </div>

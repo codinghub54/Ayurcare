@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Search, Filter, Plus, Edit2, Trash2, ShieldAlert, CheckCircle, UserX, Key, Eye, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import FeeFields, { emptyFeeState, feeStateFrom, feePayload, type FeeFormState } from '@/components/doctor/FeeFields';
+import { getConsultFees } from '@/lib/doctor-fees';
 
 export default function AdminUsersManager() {
   const { user: currentAdmin } = useAuth();
@@ -23,7 +25,7 @@ export default function AdminUsersManager() {
   
   // Doctor profile fields edit
   const [editDocQual, setEditDocQual] = useState('');
-  const [editDocFee, setEditDocFee] = useState('');
+  const [editDocFees, setEditDocFees] = useState<FeeFormState>(emptyFeeState());
   const [editDocExp, setEditDocExp] = useState('');
   const [editDocSpec, setEditDocSpec] = useState('');
 
@@ -34,6 +36,18 @@ export default function AdminUsersManager() {
   const [newPassword, setNewPassword] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<'PATIENT' | 'DOCTOR' | 'ADMIN'>('PATIENT');
+  // Doctor details for manual creation (same fields as the public application form)
+  const [newDocQual, setNewDocQual] = useState('');
+  const [newDocReg, setNewDocReg] = useState('');
+  const [newDocSpec, setNewDocSpec] = useState('');
+  const [newDocExp, setNewDocExp] = useState('');
+  const [newDocLang, setNewDocLang] = useState('English, Hindi');
+  const [newDocAddress, setNewDocAddress] = useState('');
+  const [newDocFees, setNewDocFees] = useState<FeeFormState>(emptyFeeState());
+  const [newDocDocument, setNewDocDocument] = useState('');
+  const [newDocDocumentName, setNewDocDocumentName] = useState('');
+  const [newDocAadhaar, setNewDocAadhaar] = useState('');
+  const [createError, setCreateError] = useState('');
   
   // Action notifications
   const [alertMsg, setAlertMsg] = useState('');
@@ -79,7 +93,7 @@ export default function AdminUsersManager() {
 
     if (u.role === 'DOCTOR' && u.doctorProfile) {
       setEditDocQual(u.doctorProfile.qualification || '');
-      setEditDocFee(String(u.doctorProfile.feePerConsult || '500'));
+      setEditDocFees(feeStateFrom(getConsultFees(u.doctorProfile)));
       setEditDocExp(String(u.doctorProfile.experienceYears || '0'));
       setEditDocSpec(u.doctorProfile.specializations || '');
     }
@@ -101,9 +115,15 @@ export default function AdminUsersManager() {
       };
 
       if (editingUser.role === 'DOCTOR') {
+        const feeResult = feePayload(editDocFees);
+        if ('error' in feeResult) {
+          setErrorMsg(feeResult.error);
+          setActionLoading(false);
+          return;
+        }
         body.doctorProfile = {
           qualification: editDocQual,
-          feePerConsult: parseFloat(editDocFee),
+          fees: feeResult.fees,
           experienceYears: parseInt(editDocExp),
           specializations: editDocSpec,
         };
@@ -130,10 +150,60 @@ export default function AdminUsersManager() {
     }
   };
 
+  const resetCreateForm = () => {
+    setNewName('');
+    setNewEmail('');
+    setNewPassword('');
+    setNewPhone('');
+    setNewRole('PATIENT');
+    setNewDocQual('');
+    setNewDocReg('');
+    setNewDocSpec('');
+    setNewDocExp('');
+    setNewDocLang('English, Hindi');
+    setNewDocAddress('');
+    setNewDocFees(emptyFeeState());
+    setNewDocDocument('');
+    setNewDocDocumentName('');
+    setNewDocAadhaar('');
+    setCreateError('');
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setAlertMsg('');
+    setCreateError('');
+
+    let doctorDetails: Record<string, unknown> | undefined;
+    if (newRole === 'DOCTOR') {
+      if (!newDocQual.trim() || !newDocReg.trim() || !newDocSpec.trim() || newDocExp === '') {
+        setCreateError('Please fill in qualification, registration number, specialisation and experience.');
+        return;
+      }
+      const feeResult = feePayload(newDocFees);
+      if ('error' in feeResult) {
+        setCreateError(feeResult.error);
+        return;
+      }
+      const aadhaar = newDocAadhaar.replace(/\s/g, '');
+      if (aadhaar && !/^\d{12}$/.test(aadhaar)) {
+        setCreateError('Aadhaar number must be exactly 12 digits (or leave it empty).');
+        return;
+      }
+      doctorDetails = {
+        qualification: newDocQual,
+        regNumber: newDocReg,
+        specializations: newDocSpec,
+        experienceYears: parseInt(newDocExp, 10),
+        languages: newDocLang,
+        clinicAddress: newDocAddress,
+        fees: feeResult.fees,
+        documents: newDocDocument || undefined,
+        aadhaarNumber: aadhaar || undefined,
+      };
+    }
+
     setActionLoading(true);
 
     try {
@@ -146,20 +216,18 @@ export default function AdminUsersManager() {
           password: newPassword,
           phone: newPhone,
           role: newRole,
+          doctorDetails,
         }),
       });
 
       if (res.ok) {
         setAlertMsg('User account created successfully!');
         setCreatingUser(false);
-        setNewName('');
-        setNewEmail('');
-        setNewPassword('');
-        setNewPhone('');
+        resetCreateForm();
         fetchUsers();
       } else {
         const data = await res.json();
-        setErrorMsg(data.error || 'Failed to create user account.');
+        setCreateError(data.error || 'Failed to create user account.');
       }
     } catch (e) {
       setErrorMsg('Connection error.');
@@ -391,7 +459,7 @@ export default function AdminUsersManager() {
       {/* Manual Creation Modal */}
       {creatingUser && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-8 shadow-2xl relative">
+          <div className={`bg-slate-900 border border-slate-800 rounded-xl w-full p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto ${newRole === 'DOCTOR' ? 'max-w-2xl' : 'max-w-md'}`}>
             <h3 className="font-display text-xl font-bold text-white mb-6">Manually Create User Account</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
@@ -424,6 +492,7 @@ export default function AdminUsersManager() {
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="8+ characters, a number and a symbol"
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none"
                 />
               </div>
@@ -451,10 +520,100 @@ export default function AdminUsersManager() {
                 </select>
               </div>
 
+              {newRole === 'DOCTOR' && (
+                <div className="space-y-4 border-t border-slate-800 pt-5">
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Physician details</h4>
+                    <p className="mt-1 text-xs text-slate-400">Enter the doctor&apos;s real details. Accounts created here are approved immediately, so check the registration number first.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="new-doc-qual" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Highest qualification</label>
+                      <select id="new-doc-qual" value={newDocQual} onChange={(e) => setNewDocQual(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        <option value="">Select degree</option>
+                        <option value="BAMS">BAMS (Bachelor of Ayurvedic Medicine and Surgery)</option>
+                        <option value="MD (Ayurveda)">MD (Ayurveda)</option>
+                        <option value="BAMS, PhD">BAMS, PhD (Ayurvedic Research)</option>
+                        <option value="MS (Ayurveda)">MS (Ayurvedic Surgery)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="new-doc-reg" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Medical registration number</label>
+                      <input id="new-doc-reg" type="text" value={newDocReg} onChange={(e) => setNewDocReg(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2">
+                      <label htmlFor="new-doc-spec" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Specialisations</label>
+                      <input id="new-doc-spec" type="text" value={newDocSpec} onChange={(e) => setNewDocSpec(e.target.value)} placeholder="e.g. Panchakarma, Kayachikitsa" className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label htmlFor="new-doc-exp" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Years of experience</label>
+                      <input id="new-doc-exp" type="number" min={0} max={70} value={newDocExp} onChange={(e) => setNewDocExp(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="new-doc-lang" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Languages</label>
+                      <input id="new-doc-lang" type="text" value={newDocLang} onChange={(e) => setNewDocLang(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label htmlFor="new-doc-addr" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Clinic address (optional)</label>
+                      <input id="new-doc-addr" type="text" value={newDocAddress} onChange={(e) => setNewDocAddress(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Consultation fees (INR)</span>
+                    <FeeFields value={newDocFees} onChange={setNewDocFees} tone="dark" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="new-doc-file" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Credential document (optional)</label>
+                      <input
+                        id="new-doc-file"
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setCreateError('');
+                          if (!file) return;
+                          if (file.size > 2 * 1024 * 1024) {
+                            setCreateError('Credential document must be under 2 MB.');
+                            e.target.value = '';
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setNewDocDocument(String(reader.result || ''));
+                            setNewDocDocumentName(file.name);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-slate-200"
+                      />
+                      {newDocDocumentName && <span className="mt-1 block text-xs text-emerald-400">Selected: {newDocDocumentName}</span>}
+                    </div>
+                    <div>
+                      <label htmlFor="new-doc-aadhaar" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aadhaar number (optional)</label>
+                      <input id="new-doc-aadhaar" type="text" inputMode="numeric" maxLength={14} value={newDocAadhaar} onChange={(e) => setNewDocAadhaar(e.target.value.replace(/[^0-9 ]/g, ''))} className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-200 text-sm focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {createError && (
+                <div role="alert" className="rounded-lg border border-red-900 bg-red-950/60 px-4 py-3 text-sm text-red-300">
+                  {createError}
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setCreatingUser(false)}
+                  onClick={() => {
+                    setCreatingUser(false);
+                    resetCreateForm();
+                  }}
                   className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-400 font-bold rounded-lg text-sm cursor-pointer"
                 >
                   Cancel
@@ -488,7 +647,7 @@ export default function AdminUsersManager() {
                   required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
@@ -500,7 +659,7 @@ export default function AdminUsersManager() {
                   required
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
@@ -511,7 +670,7 @@ export default function AdminUsersManager() {
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                  className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>
 
@@ -522,7 +681,7 @@ export default function AdminUsersManager() {
                     id="edit-status"
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-slate-900"
+                    className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 bg-slate-900"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="PENDING">PENDING</option>
@@ -542,7 +701,7 @@ export default function AdminUsersManager() {
                     value={editSuspensionReason}
                     onChange={(e) => setEditSuspensionReason(e.target.value)}
                     placeholder="e.g. Incomplete profile details, violating policy"
-                    className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                    className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
                   />
                 </div>
               )}
@@ -559,19 +718,13 @@ export default function AdminUsersManager() {
                         type="text"
                         value={editDocQual}
                         onChange={(e) => setEditDocQual(e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg"
+                        className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg"
                       />
                     </div>
-                    <div>
-                      <label htmlFor="edit-fee" className="block text-xs font-bold text-slate-400 uppercase mb-1">Consult Fee (INR)</label>
-                      <input
-                        id="edit-fee"
-                        type="number"
-                        value={editDocFee}
-                        onChange={(e) => setEditDocFee(e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg"
-                      />
-                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-slate-400 uppercase mb-2">Consultation fees (INR)</span>
+                    <FeeFields value={editDocFees} onChange={setEditDocFees} tone="dark" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -581,7 +734,7 @@ export default function AdminUsersManager() {
                         type="number"
                         value={editDocExp}
                         onChange={(e) => setEditDocExp(e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg"
+                        className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg"
                       />
                     </div>
                     <div className="col-span-2">
@@ -591,7 +744,7 @@ export default function AdminUsersManager() {
                         type="text"
                         value={editDocSpec}
                         onChange={(e) => setEditDocSpec(e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-955 text-slate-200 text-sm border border-slate-700 rounded-lg"
+                        className="w-full px-4 py-2 bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg"
                       />
                     </div>
                   </div>

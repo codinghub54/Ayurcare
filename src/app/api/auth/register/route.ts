@@ -3,18 +3,37 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { sendOtpEmail } from '@/lib/email';
+import { validateDoctorDetails, PASSWORD_RULE, PASSWORD_RULE_MESSAGE, type DoctorProfileData } from '@/lib/doctor-validation';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, phone, role, doctorDetails } = body;
+    const { password, role, doctorDetails } = body;
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 20) : '';
 
     if (!email || !password || !name || !role) {
-      return NextResponse.json({ error: 'Missing mandatory fields' }, { status: 400 });
+      return NextResponse.json({ error: 'Please fill in your name, email and password.' }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
     }
 
     if (role !== 'PATIENT' && role !== 'DOCTOR') {
       return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 });
+    }
+
+    // Validate doctor details up front so nothing is created for an invalid application
+    let doctorData: DoctorProfileData | null = null;
+    if (role === 'DOCTOR') {
+      const check = validateDoctorDetails(doctorDetails, { requireKyc: true });
+      if ('error' in check) return NextResponse.json({ error: check.error }, { status: 400 });
+      doctorData = check.data;
+      const existingLicense = await prisma.doctorProfile.findUnique({ where: { regNumber: doctorData.regNumber } });
+      if (existingLicense) {
+        return NextResponse.json({ error: 'This medical registration number is already registered.' }, { status: 409 });
+      }
     }
 
     // Check if user already exists
@@ -34,12 +53,8 @@ export async function POST(request: Request) {
     }
 
     // Password strength check (8+ chars, at least one number and symbol)
-    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters long and contain at least one number and one symbol' },
-        { status: 400 }
-      );
+    if (typeof password !== 'string' || !PASSWORD_RULE.test(password)) {
+      return NextResponse.json({ error: PASSWORD_RULE_MESSAGE }, { status: 400 });
     }
 
     // Hash password
@@ -66,35 +81,14 @@ export async function POST(request: Request) {
             lifestyleData: '{}',
           },
         });
-      } else if (role === 'DOCTOR') {
-        if (!doctorDetails) {
-          throw new PublicError('Doctor qualifications and registration details are required');
-        }
-        const { qualification, regNumber, specializations, experienceYears, feePerConsult, documents, clinicAddress, languages, aadhaarNumber, faceIdImage } = doctorDetails;
-
-        // Check unique license number
-        const existingLicense = await tx.doctorProfile.findUnique({
-          where: { regNumber },
-        });
-        if (existingLicense) {
-          throw new PublicError('License registration number is already registered', 409);
-        }
-
+      } else if (role === 'DOCTOR' && doctorData) {
+        const { fees: _fees, ...profile } = doctorData;
         await tx.doctorProfile.create({
           data: {
             userId: newUser.id,
-            qualification,
-            regNumber,
-            specializations: specializations || 'General Ayurveda',
-            experienceYears: parseInt(experienceYears || '0'),
-            feePerConsult: parseFloat(feePerConsult || '0'),
-            documents: documents || '',
-            clinicAddress: clinicAddress || '',
-            languages: languages || 'English, Hindi',
+            ...profile,
             isApproved: false,
             approvalStatus: 'PENDING',
-            aadhaarNumber: aadhaarNumber || null,
-            faceIdImage: faceIdImage || null,
           },
         });
       }

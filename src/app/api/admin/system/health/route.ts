@@ -39,8 +39,8 @@ export async function GET() {
     }
 
     // 2. Razorpay payment gateway check
-    const rzpKey = process.env.RAZORPAY_KEY_ID;
-    if (rzpKey && process.env.RAZORPAY_KEY_SECRET && (rzpKey.startsWith('rzp_test_') || rzpKey.startsWith('rzp_live_'))) {
+    const rzpKey = (process.env.RAZORPAY_KEY_ID || '').trim();
+    if (rzpKey && (process.env.RAZORPAY_KEY_SECRET || '').trim() && (rzpKey.startsWith('rzp_test_') || rzpKey.startsWith('rzp_live_'))) {
       checks.payments = {
         status: 'UP',
         provider: 'Razorpay',

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
+import { validateFees, availabilityWithFees, availabilityWithSchedule, lowestFee } from '@/lib/doctor-fees';
 
 async function verifyDoctor() {
   const cookieStore = await cookies();
@@ -35,7 +36,16 @@ export async function PUT(request: Request) {
     if (!doctor) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { name, phone, qualification, specializations, experienceYears, bio, feePerConsult, clinicAddress, languages, availability } = body;
+    const { name, phone, qualification, specializations, experienceYears, bio, fees, clinicAddress, languages, availability } = body;
+
+    // Fees per consultation type are validated before anything is written
+    let cleanFees: ReturnType<typeof validateFees> | null = null;
+    if (fees !== undefined) {
+      cleanFees = validateFees(fees);
+      if ('error' in cleanFees) return NextResponse.json({ error: cleanFees.error }, { status: 400 });
+    }
+    const current = await prisma.doctorProfile.findUnique({ where: { userId: doctor.userId }, select: { availability: true } });
+    if (!current) return NextResponse.json({ error: 'Doctor profile not found.' }, { status: 404 });
 
     const updated = await prisma.$transaction(async (tx: any) => {
       // Update User details
@@ -54,10 +64,18 @@ export async function PUT(request: Request) {
       if (specializations) profileUpdate.specializations = specializations;
       if (experienceYears !== undefined) profileUpdate.experienceYears = parseInt(experienceYears);
       if (bio !== undefined) profileUpdate.bio = bio;
-      if (feePerConsult !== undefined) profileUpdate.feePerConsult = parseFloat(feePerConsult);
       if (clinicAddress !== undefined) profileUpdate.clinicAddress = clinicAddress;
       if (languages !== undefined) profileUpdate.languages = languages;
-      if (availability !== undefined) profileUpdate.availability = JSON.stringify(availability);
+      // availability JSON holds both the weekly schedule and the fees; merge so one never wipes the other
+      let availabilityJson = current.availability;
+      if (availability !== undefined && availability && typeof availability === 'object') {
+        availabilityJson = availabilityWithSchedule(availabilityJson, availability);
+      }
+      if (cleanFees && 'fees' in cleanFees) {
+        availabilityJson = availabilityWithFees(availabilityJson, cleanFees.fees);
+        profileUpdate.feePerConsult = lowestFee(cleanFees.fees) ?? 0;
+      }
+      if (availabilityJson !== current.availability) profileUpdate.availability = availabilityJson;
 
       const profile = await tx.doctorProfile.update({
         where: { userId: doctor.userId },

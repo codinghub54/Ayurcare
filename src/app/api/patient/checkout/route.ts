@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { createOrder, getRazorpayKeyId, RazorpayNotConfiguredError } from '@/lib/razorpay';
 import { apiError, PublicError } from '@/lib/api-error';
 import { CONSULT_TYPES, type ConsultType, assertSlotAvailable, quoteConsultation, finalizeBooking } from '@/lib/booking';
+import { getConsultFees, CONSULT_TYPE_LABELS } from '@/lib/doctor-fees';
 
 const COMMISSION_RATE = 0.15;
 
@@ -35,9 +36,13 @@ export async function POST(request: Request) {
 
     const doctor = await prisma.doctorProfile.findFirst({
       where: { userId: doctorId, isApproved: true, user: { status: 'ACTIVE' } },
-      select: { feePerConsult: true },
+      select: { feePerConsult: true, availability: true },
     });
     if (!doctor) throw new PublicError('This physician cannot accept consultations at the moment.');
+    const typeFee = getConsultFees(doctor)[type];
+    if (typeFee === null) {
+      throw new PublicError(`This physician does not offer ${CONSULT_TYPE_LABELS[type].toLowerCase()} consultations.`);
+    }
 
     let familyMemberId: string | null = null;
     if (typeof body.familyMemberId === 'string' && body.familyMemberId) {
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
       patientId: patient.userId,
       doctorId,
       type,
-      fee: doctor.feePerConsult,
+      fee: typeFee,
       couponCode: body.couponCode,
     });
 

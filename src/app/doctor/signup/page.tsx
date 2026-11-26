@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Stethoscope, AlertCircle, UploadCloud, Camera, Check, User } from 'lucide-react';
 import AuthShell, { authInput, authLabel, authPrimaryButton } from '@/components/auth/AuthShell';
+import FeeFields, { emptyFeeState, feePayload, type FeeFormState } from '@/components/doctor/FeeFields';
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve) => {
@@ -69,7 +70,8 @@ export default function DoctorSignup() {
   const [regNumber, setRegNumber] = useState('');
   const [specializations, setSpecializations] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
-  const [feePerConsult, setFeePerConsult] = useState('500');
+  const [fees, setFees] = useState<FeeFormState>(emptyFeeState());
+  const errorRef = useRef<HTMLDivElement>(null);
   const [clinicAddress, setClinicAddress] = useState('');
   const [languages, setLanguages] = useState('English, Hindi');
 
@@ -163,7 +165,7 @@ export default function DoctorSignup() {
     }
 
     const hasNumber = /[0-9]/.test(password);
-    const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasSymbol = /[^A-Za-z0-9]/.test(password);
     const isLongEnough = password.length >= 8;
 
     if (isLongEnough && hasNumber && hasSymbol) {
@@ -175,38 +177,35 @@ export default function DoctorSignup() {
     }
   }, [password]);
 
+  /** Show a validation problem next to the submit button and bring it into view. */
+  const fail = (message: string) => {
+    setError(message);
+    requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     // Field checks
-    if (!name || !email || !password || !phone || !regNumber || !specializations || !experienceYears) {
-      setError('Please fill in all mandatory physician fields');
-      return;
+    if (!name.trim() || !email.trim() || !phone.trim()) return fail('Please enter your name, email and phone number.');
+    if (!/^\+?[0-9\s-]{10,15}$/.test(phone.trim())) return fail('Please enter a valid phone number (10 digits, optionally with +91).');
+    if (!qualification) return fail('Please select your highest qualification.');
+    if (!regNumber.trim()) return fail('Please enter your medical registration number.');
+    if (!specializations.trim()) return fail('Please enter at least one area of specialisation.');
+    if (experienceYears === '' || Number(experienceYears) < 0 || Number(experienceYears) > 70) {
+      return fail('Please enter your years of experience (0 to 70).');
     }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    const feeResult = feePayload(fees);
+    if ('error' in feeResult) return fail(feeResult.error);
     if (passwordStrength !== 'strong') {
-      setError('Password must meet minimum strength requirements (8+ characters, at least one number and one symbol)');
-      return;
+      return fail('Your password needs at least 8 characters, including a number and a symbol (for example ! @ # - _).');
     }
-    if (!uploadName) {
-      setError('Please upload your license/degree credentials proof');
-      return;
-    }
-
+    if (password !== confirmPassword) return fail('The two passwords do not match.');
+    if (!uploadName || !uploadDataUrl) return fail('Please upload your licence or degree certificate.');
     const cleanAadhaar = aadhaarNumber.replace(/\s/g, '');
-    if (!/^\d{12}$/.test(cleanAadhaar)) {
-      setError('Aadhaar number must be exactly 12 digits');
-      return;
-    }
-
-    if (!capturedImage) {
-      setError('Please capture or upload your Face ID photograph');
-      return;
-    }
+    if (!/^\d{12}$/.test(cleanAadhaar)) return fail('Aadhaar number must be exactly 12 digits.');
+    if (!capturedImage) return fail('Please take or upload a clear photo of your face for identity verification.');
 
     setLoading(true);
     try {
@@ -214,20 +213,20 @@ export default function DoctorSignup() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          email,
-          phone,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
           password,
           role: 'DOCTOR',
           doctorDetails: {
             qualification,
-            regNumber,
-            specializations,
-            experienceYears: parseInt(experienceYears),
-            feePerConsult: parseFloat(feePerConsult),
+            regNumber: regNumber.trim(),
+            specializations: specializations.trim(),
+            experienceYears: parseInt(experienceYears, 10),
+            fees: feeResult.fees,
             clinicAddress,
             languages,
-            documents: uploadDataUrl || uploadName,
+            documents: uploadDataUrl,
             aadhaarNumber: cleanAadhaar,
             faceIdImage: capturedImage,
           },
@@ -241,10 +240,10 @@ export default function DoctorSignup() {
       } else {
         const text = await res.text();
         if (res.status === 413 || text.includes('Request Entity')) {
-          setError('Registration failed: Uploaded file or photo size is too large (max 3MB). Please select a smaller file.');
+          fail('Your uploaded document is too large. Please upload a file under 2 MB (a photo of the certificate works well).');
           return;
         }
-        setError(`Server returned an error (${res.status}). Please try again.`);
+        fail(`Server returned an error (${res.status}). Please try again.`);
         return;
       }
 
@@ -252,11 +251,11 @@ export default function DoctorSignup() {
         // Redirect to pending review holding page directly
         router.push('/doctor/pending');
       } else {
-        setError(data.error || 'Registration failed');
+        fail(data.error || 'Registration failed. Please try again.');
       }
     } catch (err: any) {
       console.error('Registration fetch error:', err);
-      setError(err?.message || 'Registration failed. Network payload issue.');
+      fail('Could not reach the server. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -282,7 +281,7 @@ export default function DoctorSignup() {
       eyebrow="Join as a physician"
       headline="Practise Ayurveda online, on your own schedule."
       points={[
-        'Set your own consultation fee and availability',
+        'Set separate fees for video, audio and chat',
         'Consult patients over in-browser video',
         'Every application is reviewed by our team before approval',
       ]}
@@ -296,12 +295,6 @@ export default function DoctorSignup() {
             </p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-xl border border-red-200 text-sm mb-4 flex items-start">
-              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="text-xs font-bold text-forest uppercase tracking-[0.14em] border-b border-line pb-1">1. Account Details</h3>
@@ -393,7 +386,7 @@ export default function DoctorSignup() {
                   <div className={`h-full transition-all duration-300 ${getStrengthBarColor()}`}></div>
                 </div>
                 <div className="flex justify-between items-center text-[10px]">
-                  <span className="text-slate-400">Security Check:</span>
+                  <span className="text-slate-400">8+ characters with a number and a symbol</span>
                   <span className="font-bold uppercase tracking-wider text-slate-700">{getStrengthText()}</span>
                 </div>
               </div>
@@ -461,20 +454,8 @@ export default function DoctorSignup() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="fee" className={authLabel}>Fee per Consult (INR)</label>
-                <input
-                  id="fee"
-                  type="number"
-                  required
-                  min={100}
-                  value={feePerConsult}
-                  onChange={(e) => setFeePerConsult(e.target.value)}
-                  className={`${authInput}`}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label htmlFor="address" className={authLabel}>Clinic / Hospital Address</label>
+              <div className="sm:col-span-3">
+                <label htmlFor="address" className={authLabel}>Clinic / Hospital Address <span className="font-normal text-ink-muted">(optional)</span></label>
                 <input
                   id="address"
                   type="text"
@@ -487,16 +468,32 @@ export default function DoctorSignup() {
             </div>
 
             <div className="pt-2">
+              <span className={authLabel}>Consultation fees (INR)</span>
+              <p className="mb-2.5 text-xs text-ink-muted">Set your own fee for each type you offer and untick any type you do not offer. You can change these later.</p>
+              <FeeFields value={fees} onChange={setFees} />
+            </div>
+
+            <div className="pt-2">
               <label className={authLabel}>Upload Medical Credentials (License / Degree)</label>
               <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition cursor-pointer relative">
                 <input
                   type="file"
+                  accept="application/pdf,image/jpeg,image/png"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
                       setUploadName(file.name);
-                      if (file.size > 3.5 * 1024 * 1024) {
-                        setError('Document size must be under 3.5MB. Please select a smaller scan or PDF.');
+                      const isImage = file.type.startsWith('image/');
+                      if (!isImage && file.type !== 'application/pdf') {
+                        setError('Please upload a PDF, JPG or PNG file.');
+                        setUploadName('');
+                        setUploadDataUrl('');
+                        return;
+                      }
+                      // Images are compressed below; PDFs must stay small enough for the upload limit
+                      if (!isImage && file.size > 2 * 1024 * 1024) {
+                        setError('PDF must be under 2 MB. Tip: upload a photo (JPG or PNG) of the certificate instead.');
+                        setUploadName('');
                         setUploadDataUrl('');
                         return;
                       }
@@ -509,7 +506,7 @@ export default function DoctorSignup() {
                 />
                 <UploadCloud className="w-8 h-8 mx-auto text-slate-400 mb-2" />
                 <span className="text-xs font-semibold text-primary-600">Click to upload files</span>
-                <p className="text-[10px] text-slate-400 mt-1">PDF, JPG, PNG up to 3.5MB</p>
+                <p className="text-[10px] text-slate-400 mt-1">JPG or PNG photo, or a PDF up to 2 MB</p>
                 {uploadName && (
                   <span className="text-xs font-bold text-green-600 block mt-2">✓ Selected: {uploadName}</span>
                 )}
@@ -607,6 +604,13 @@ export default function DoctorSignup() {
                 <canvas ref={canvasRef} className="hidden" />
               </div>
             </div>
+
+            {error && (
+              <div ref={errorRef} role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             <button
               type="submit"

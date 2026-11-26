@@ -17,19 +17,22 @@ export class RazorpayNotConfiguredError extends Error {
   }
 }
 
+// Values pasted into a dashboard often carry stray spaces or line breaks; ignore them.
+const env = (name: string) => (process.env[name] || '').trim();
+
 export function getRazorpayKeyId(): string {
-  const id = process.env.RAZORPAY_KEY_ID;
-  if (!id || !process.env.RAZORPAY_KEY_SECRET) throw new RazorpayNotConfiguredError();
+  const id = env('RAZORPAY_KEY_ID');
+  if (!id || !env('RAZORPAY_KEY_SECRET')) throw new RazorpayNotConfiguredError();
   return id;
 }
 
 export function isRazorpayConfigured() {
-  return !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+  return !!(env('RAZORPAY_KEY_ID') && env('RAZORPAY_KEY_SECRET'));
 }
 
 async function rzp<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const keyId = getRazorpayKeyId();
-  const secret = process.env.RAZORPAY_KEY_SECRET!;
+  const secret = env('RAZORPAY_KEY_SECRET');
   const res = await fetch(`${API}${path}`, {
     method: init?.method || 'GET',
     headers: {
@@ -128,7 +131,7 @@ function safeEqual(a: string, b: string) {
 
 /** Checkout handler signature: HMAC_SHA256(order_id + "|" + payment_id, key_secret). */
 export function verifyPaymentSignature(orderId: string, paymentId: string, signature: string) {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
+  const secret = env('RAZORPAY_KEY_SECRET');
   if (!secret || !signature) return false;
   const expected = crypto.createHmac('sha256', secret).update(`${orderId}|${paymentId}`).digest('hex');
   return safeEqual(expected, signature);
@@ -136,7 +139,7 @@ export function verifyPaymentSignature(orderId: string, paymentId: string, signa
 
 /** Webhook signature: HMAC_SHA256(raw body, webhook secret). */
 export function verifyWebhookSignature(rawBody: string, signature: string) {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret = env('RAZORPAY_WEBHOOK_SECRET');
   if (!secret || !signature) return false;
   const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
   return safeEqual(expected, signature);

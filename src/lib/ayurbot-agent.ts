@@ -9,6 +9,7 @@
  */
 import { prisma } from '@/lib/db';
 import { PENDING_HOLD_MINUTES } from '@/lib/booking';
+import { getConsultFees } from '@/lib/doctor-fees';
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
@@ -144,7 +145,7 @@ async function findDoctors(query?: string) {
       id: true,
       name: true,
       doctorProfile: {
-        select: { qualification: true, specializations: true, experienceYears: true, feePerConsult: true, languages: true, avgRating: true, bio: true },
+        select: { qualification: true, specializations: true, experienceYears: true, feePerConsult: true, availability: true, languages: true, avgRating: true, bio: true },
       },
     },
     take: 50,
@@ -164,7 +165,7 @@ async function findDoctors(query?: string) {
       specializations: d.doctorProfile?.specializations,
       languages: d.doctorProfile?.languages,
       experienceYears: d.doctorProfile?.experienceYears,
-      feeInr: d.doctorProfile?.feePerConsult,
+      feesInr: d.doctorProfile ? getConsultFees(d.doctorProfile) : null, // null = type not offered
       rating: d.doctorProfile?.avgRating ? Number(d.doctorProfile.avgRating.toFixed(1)) : 'no ratings yet',
     }));
   return { count: list.length, doctors: list, note: list.length === 0 ? 'No approved doctors match. Offer to show all doctors.' : undefined };
@@ -204,7 +205,7 @@ export async function getDoctorSlots(doctorId: string, date: string) {
     .filter((t) => !bookedTimes.has(t))
     .filter((t) => date !== today || t > nowIst);
 
-  return { doctorName: doctor.user.name, date, timezone: 'IST', feeInr: doctor.feePerConsult, openSlots: slots };
+  return { doctorName: doctor.user.name, date, timezone: 'IST', feesInr: getConsultFees(doctor), openSlots: slots };
 }
 
 async function getMyAppointments(userId: string) {
@@ -254,12 +255,16 @@ async function runTool(
       const doctorId = String(args.doctorId || '');
       const doctor = await prisma.user.findFirst({
         where: { id: doctorId, role: 'DOCTOR', status: 'ACTIVE', doctorProfile: { isApproved: true } },
-        select: { name: true, doctorProfile: { select: { feePerConsult: true } } },
+        select: { name: true, doctorProfile: { select: { feePerConsult: true, availability: true } } },
       });
       if (!doctor) return { error: 'Doctor not found. Call find_doctors first.' };
       const date = typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date) ? args.date : undefined;
       const time = typeof args.time === 'string' && /^\d{2}:\d{2}$/.test(args.time) ? args.time : undefined;
       const consultType = args.consultType === 'AUDIO' || args.consultType === 'CHAT' ? args.consultType : 'VIDEO';
+      const typeFees = doctor.doctorProfile ? getConsultFees(doctor.doctorProfile) : null;
+      if (typeFees && typeFees[consultType] === null) {
+        return { error: `This doctor does not offer ${consultType.toLowerCase()} consultations. Offer another type.` };
+      }
       const params = new URLSearchParams({ doctor: doctorId, type: consultType });
       if (date) params.set('date', date);
       if (time) params.set('time', time);
@@ -267,7 +272,7 @@ async function runTool(
         type: 'start_booking',
         doctorId,
         doctorName: doctor.name,
-        fee: doctor.doctorProfile?.feePerConsult ?? null,
+        fee: typeFees ? typeFees[consultType] : null,
         date,
         time,
         consultType,

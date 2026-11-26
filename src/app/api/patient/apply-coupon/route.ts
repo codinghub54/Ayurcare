@@ -1,3 +1,4 @@
+import { getConsultFees } from '@/lib/doctor-fees';
 import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -85,7 +86,9 @@ export async function POST(request: Request) {
         where: { userId: doctorId },
       });
       if (doc) {
-        subtotal = doc.feePerConsult;
+        const fees = getConsultFees(doc);
+        const t: 'VIDEO' | 'AUDIO' | 'CHAT' = consultationType === 'AUDIO' || consultationType === 'CHAT' ? consultationType : 'VIDEO';
+        subtotal = fees[t] ?? doc.feePerConsult;
       }
     }
 

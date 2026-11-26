@@ -1,3 +1,4 @@
+import { validateDoctorDetails, PASSWORD_RULE, PASSWORD_RULE_MESSAGE, type DoctorProfileData } from '@/lib/doctor-validation';
 import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
             specializations: true,
             experienceYears: true,
             feePerConsult: true,
+            availability: true,
             isApproved: true,
             approvalStatus: true,
           },
@@ -90,16 +92,34 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, email, password, phone, role, doctorDetails } = body;
+    const { password, role, doctorDetails } = body;
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 20) : '';
 
     if (!name || !email || !password || !role) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json({ error: 'Name, email, password and role are required.' }, { status: 400 });
+    }
+    if (!['PATIENT', 'DOCTOR', 'ADMIN'].includes(role)) {
+      return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
+    }
+    if (typeof password !== 'string' || !PASSWORD_RULE.test(password)) {
+      return NextResponse.json({ error: PASSWORD_RULE_MESSAGE }, { status: 400 });
     }
 
-    // Check if user exists
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
+      return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 400 });
+    }
+
+    // Doctors need real professional details: nothing is invented on the server
+    let doctorData: DoctorProfileData | null = null;
+    if (role === 'DOCTOR') {
+      const check = validateDoctorDetails(doctorDetails, { requireKyc: false });
+      if ('error' in check) return NextResponse.json({ error: check.error }, { status: 400 });
+      doctorData = check.data;
+      const dupe = await prisma.doctorProfile.findUnique({ where: { regNumber: doctorData.regNumber } });
+      if (dupe) return NextResponse.json({ error: 'This medical registration number is already registered.' }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -124,23 +144,14 @@ export async function POST(request: Request) {
             lifestyleData: '{}',
           },
         });
-      } else if (role === 'DOCTOR') {
-        const q = doctorDetails?.qualification || 'BAMS';
-        const reg = doctorDetails?.regNumber || `ADMIN-REG-${Math.floor(10000 + Math.random() * 90000)}`;
-        const spec = doctorDetails?.specializations || 'General Medicine';
-        const exp = parseInt(doctorDetails?.experienceYears || '0');
-        const fee = parseFloat(doctorDetails?.feePerConsult || '0');
-
+      } else if (role === 'DOCTOR' && doctorData) {
+        const { fees: _fees, ...profile } = doctorData;
         await tx.doctorProfile.create({
           data: {
             userId: user.id,
-            qualification: q,
-            regNumber: reg,
-            specializations: spec,
-            experienceYears: exp,
-            feePerConsult: fee,
-            documents: '',
-            isApproved: true, // Manually created doctors by admin are auto-approved
+            ...profile,
+            // Created and checked by an administrator, so approved straight away
+            isApproved: true,
             approvalStatus: 'APPROVED',
           },
         });

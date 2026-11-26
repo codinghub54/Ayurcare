@@ -72,20 +72,19 @@ export async function POST(request: Request) {
           scheduledAt: scheduledDate,
           type: type || 'VIDEO',
           status: 'CONFIRMED',
-          feePaid: doctorProfile.feePerConsult,
+          // Doctor-scheduled follow-ups are complimentary: the patient is not charged,
+          // so no revenue or commission is recorded for them.
+          feePaid: 0,
         },
       });
-
-      // Platform commission 15%
-      const commission = doctorProfile.feePerConsult * 0.15;
 
       await tx.payment.create({
         data: {
           appointmentId: appointment.id,
-          amount: doctorProfile.feePerConsult,
-          commission,
+          amount: 0,
+          commission: 0,
           status: 'SUCCESS',
-          gatewayRefId: `ch_doc_manual_${Math.random().toString(36).substring(7)}`,
+          gatewayRefId: 'FOLLOW_UP_NO_CHARGE',
         },
       });
 

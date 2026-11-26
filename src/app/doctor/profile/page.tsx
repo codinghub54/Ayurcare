@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, ShieldAlert, Save, User } from 'lucide-react';
+import FeeFields, { emptyFeeState, feeStateFrom, feePayload, type FeeFormState } from '@/components/doctor/FeeFields';
+import { getConsultFees } from '@/lib/doctor-fees';
 
 export default function DoctorProfileEditor() {
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export default function DoctorProfileEditor() {
   const [qualification, setQualification] = useState('');
   const [specializations, setSpecializations] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
-  const [feePerConsult, setFeePerConsult] = useState('');
+  const [fees, setFees] = useState<FeeFormState>(emptyFeeState());
   const [clinicAddress, setClinicAddress] = useState('');
   const [languages, setLanguages] = useState('');
 
@@ -33,7 +35,7 @@ export default function DoctorProfileEditor() {
         setQualification(profile.qualification || '');
         setSpecializations(profile.specializations || '');
         setExperienceYears(String(profile.experienceYears || '0'));
-        setFeePerConsult(String(profile.feePerConsult || '500'));
+        setFees(feeStateFrom(getConsultFees(profile)));
         setClinicAddress(profile.clinicAddress || '');
         setLanguages(profile.languages || 'English, Hindi');
       }
@@ -52,6 +54,11 @@ export default function DoctorProfileEditor() {
     e.preventDefault();
     setSuccessMsg('');
     setErrorMsg('');
+    const feeResult = feePayload(fees);
+    if ('error' in feeResult) {
+      setErrorMsg(feeResult.error);
+      return;
+    }
     setActionLoading(true);
 
     try {
@@ -64,17 +71,18 @@ export default function DoctorProfileEditor() {
           qualification,
           specializations,
           experienceYears: parseInt(experienceYears),
-          feePerConsult: parseFloat(feePerConsult),
+          fees: feeResult.fees,
           clinicAddress,
           languages,
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setSuccessMsg('Your practice profile details updated successfully!');
+        setSuccessMsg('Your practice profile has been updated.');
         fetchProfile();
       } else {
-        setErrorMsg('Failed to update details. Try again.');
+        setErrorMsg(data.error || 'Failed to update details. Try again.');
       }
     } catch (err) {
       setErrorMsg('Connection error.');
@@ -158,21 +166,16 @@ export default function DoctorProfileEditor() {
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-800 text-sm focus:ring-2 focus:ring-primary-600 focus:outline-none"
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="fee-inp" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Consultation Fee (INR)</label>
-              <input
-                id="fee-inp"
-                type="number"
-                required
-                value={feePerConsult}
-                onChange={(e) => setFeePerConsult(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-800 text-sm focus:ring-2 focus:ring-primary-600 focus:outline-none"
-              />
-            </div>
+          </div>
+
+          <div className="space-y-2">
+            <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Consultation fees (INR)</span>
+            <p className="text-xs text-slate-500">Set a fee for each type you offer. Untick a type to stop offering it.</p>
+            <FeeFields value={fees} onChange={setFees} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="sm:col-span-25 space-y-2 sm:col-span-2">
+            <div className="space-y-2 sm:col-span-2">
               <label htmlFor="spec-inp" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Specializations</label>
               <input
                 id="spec-inp"

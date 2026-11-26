@@ -1,4 +1,5 @@
-import { apiError } from '@/lib/api-error';
+import { validateFees, availabilityWithFees, lowestFee } from '@/lib/doctor-fees';
+import { apiError, PublicError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -78,13 +79,23 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
 
       // 2. Update Doctor Profile (if applicable)
       if (user.role === 'DOCTOR' && doctorProfile) {
-        const { qualification, regNumber, specializations, experienceYears, feePerConsult, clinicAddress, languages } = doctorProfile;
+        const { qualification, regNumber, specializations, experienceYears, fees, clinicAddress, languages } = doctorProfile;
         const profileUpdate: any = {};
-        if (qualification) profileUpdate.qualification = qualification;
-        if (regNumber) profileUpdate.regNumber = regNumber;
-        if (specializations) profileUpdate.specializations = specializations;
-        if (experienceYears !== undefined) profileUpdate.experienceYears = parseInt(experienceYears);
-        if (feePerConsult !== undefined) profileUpdate.feePerConsult = parseFloat(feePerConsult);
+        if (qualification) profileUpdate.qualification = String(qualification).trim();
+        if (regNumber) profileUpdate.regNumber = String(regNumber).trim();
+        if (specializations) profileUpdate.specializations = String(specializations).trim();
+        if (experienceYears !== undefined) {
+          const exp = parseInt(experienceYears, 10);
+          if (!Number.isInteger(exp) || exp < 0 || exp > 70) throw new PublicError('Years of experience must be between 0 and 70.');
+          profileUpdate.experienceYears = exp;
+        }
+        if (fees !== undefined) {
+          const check = validateFees(fees);
+          if ('error' in check) throw new PublicError(check.error);
+          const current = await tx.doctorProfile.findUnique({ where: { userId: params.id }, select: { availability: true } });
+          profileUpdate.availability = availabilityWithFees(current?.availability, check.fees);
+          profileUpdate.feePerConsult = lowestFee(check.fees) ?? 0;
+        }
         if (clinicAddress !== undefined) profileUpdate.clinicAddress = clinicAddress;
         if (languages !== undefined) profileUpdate.languages = languages;
 

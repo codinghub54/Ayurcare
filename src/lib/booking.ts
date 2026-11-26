@@ -14,8 +14,8 @@ import { prisma } from '@/lib/db';
 import { PublicError } from '@/lib/api-error';
 import { sendAppointmentConfirmationEmail } from '@/lib/email';
 
-export const CONSULT_TYPES = ['VIDEO', 'AUDIO', 'CHAT'] as const;
-export type ConsultType = (typeof CONSULT_TYPES)[number];
+export { CONSULT_TYPES, type ConsultType } from '@/lib/doctor-fees';
+import type { ConsultType } from '@/lib/doctor-fees';
 
 /** Unpaid reservations hold a slot for this long before others can book it. */
 export const PENDING_HOLD_MINUTES = 30;

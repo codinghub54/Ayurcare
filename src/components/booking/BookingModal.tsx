@@ -3,13 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { X, Loader2, ShieldCheck, CheckCircle2, AlertCircle, Video, Phone, MessageSquare, Lock } from 'lucide-react';
+import { getConsultFees } from '@/lib/doctor-fees';
 
 type ConsultType = 'VIDEO' | 'AUDIO' | 'CHAT';
 
 export interface BookableDoctor {
   id: string;
   name: string;
-  doctorProfile?: { feePerConsult?: number; qualification?: string; specializations?: string } | null;
+  doctorProfile?: { feePerConsult?: number; availability?: string | null; qualification?: string; specializations?: string } | null;
 }
 
 interface Props {
@@ -90,10 +91,14 @@ function formatTime(t: string) {
 
 export default function BookingModal({ doctor, initialType, initialDate, initialTime, onClose }: Props) {
   const dates = useMemo(() => istDates(), []);
-  const fee = doctor.doctorProfile?.feePerConsult;
+  const fees = useMemo(() => getConsultFees(doctor.doctorProfile || {}), [doctor.doctorProfile]);
+  const offeredTypes = TYPES.filter((t) => fees[t.value] !== null);
 
   const [step, setStep] = useState<'details' | 'done'>('details');
-  const [type, setType] = useState<ConsultType>(initialType || 'VIDEO');
+  const [type, setType] = useState<ConsultType>(
+    initialType && fees[initialType] !== null ? initialType : offeredTypes[0]?.value || 'VIDEO'
+  );
+  const fee = fees[type];
   const [date, setDate] = useState(initialDate && dates.some((d) => d.iso === initialDate) ? initialDate : dates[0].iso);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
@@ -284,8 +289,8 @@ export default function BookingModal({ doctor, initialType, initialDate, initial
             <div className="space-y-6">
               <div>
                 <p className="mb-2 text-sm font-semibold text-ink">Consultation type</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {TYPES.map((t) => (
+                <div className={`grid gap-2 ${offeredTypes.length === 3 ? 'grid-cols-3' : offeredTypes.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {offeredTypes.map((t) => (
                     <button
                       key={t.value}
                       type="button"
@@ -295,6 +300,7 @@ export default function BookingModal({ doctor, initialType, initialDate, initial
                       }`}
                     >
                       <t.icon className="h-4 w-4" /> {t.label}
+                      <span className="text-xs font-semibold text-ink">{rupees(fees[t.value] as number)}</span>
                     </button>
                   ))}
                 </div>
