@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
-import { getStripeClient } from '@/lib/stripe';
+import { fetchOrderPayments, refundPayment } from '@/lib/razorpay';
 
 async function verifyAdmin() {
   const cookieStore = await cookies();
@@ -92,24 +92,26 @@ export async function POST(request: Request) {
       );
     }
 
-    let stripeRefundId: string | null = null;
+    // Gateway refund id (stored in the legacy stripeRefundId column)
+    let gatewayRefundId: string | null = null;
 
     if (refundType === 'FULL' || refundType === 'PARTIAL') {
-      // Execute Stripe refund if gatewayRefId exists and is not a mock ID
-      if (payment.gatewayRefId && payment.gatewayRefId.startsWith('pi_')) {
+      // gatewayRefId holds the Razorpay order id (order_...)
+      if (payment.gatewayRefId && payment.gatewayRefId.startsWith('order_')) {
         try {
-          const stripeRefund = await getStripeClient().refunds.create({
-            payment_intent: payment.gatewayRefId,
-            amount: Math.round(refundAmount * 100), // convert to paisa
-            reason: 'requested_by_customer',
+          const payments = await fetchOrderPayments(payment.gatewayRefId);
+          const captured = payments.find((p) => p.status === 'captured' || p.status === 'refunded');
+          if (!captured) {
+            return NextResponse.json({ error: 'No captured Razorpay payment found for this booking.' }, { status: 400 });
+          }
+          const refund = await refundPayment(captured.id, Math.round(refundAmount * 100), {
+            appointmentId: payment.appointmentId,
+            reason: String(reason).slice(0, 200),
           });
-          stripeRefundId = stripeRefund.id;
-        } catch (stripeError: any) {
-          console.error('Stripe refund execution failed:', stripeError);
-          return NextResponse.json(
-            { error: `Stripe processing error: ${stripeError.message}` },
-            { status: 500 }
-          );
+          gatewayRefundId = refund.id;
+        } catch (gatewayError) {
+          console.error('Razorpay refund failed:', gatewayError);
+          return NextResponse.json({ error: 'Razorpay could not process this refund. Please try again.' }, { status: 502 });
         }
       }
     } else if (refundType === 'WALLET_CREDIT') {
@@ -142,7 +144,7 @@ export async function POST(request: Request) {
         reason,
         refundType,
         processedBy: admin.userId,
-        stripeRefundId,
+        stripeRefundId: gatewayRefundId,
       },
     });
 

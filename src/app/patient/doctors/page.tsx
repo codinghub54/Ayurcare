@@ -22,7 +22,7 @@ export default function FindAndBookDoctor() {
   const [prefill, setPrefill] = useState<{ type?: ConsultType; date?: string; time?: string }>({});
   const prefillApplied = useRef(false);
 
-  // Result after a bank/UPI redirect back from Stripe (?checkout=<appointmentId>)
+  // Result when returning to this page with ?checkout=<appointmentId> (e.g. after a payment redirect)
   const [returnStatus, setReturnStatus] = useState<'checking' | 'confirmed' | 'processing' | 'failed' | null>(null);
 
   const fetchDoctors = async () => {

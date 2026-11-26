@@ -4,11 +4,11 @@
  * Flow
  *  1. checkout (POST /api/patient/checkout): validates the slot, prices it on the
  *     server (doctor fee minus a valid coupon), creates a PENDING appointment +
- *     payment, and a Stripe PaymentIntent tied to that appointment.
- *  2. The browser collects the card with Stripe's Payment Element.
- *  3. confirm (POST /api/patient/checkout/confirm) or the Stripe webhook verifies
- *     the PaymentIntent with Stripe and calls finalizeBooking(). Whichever runs
- *     first confirms the appointment; the other is a no-op.
+ *     payment, and a Razorpay order tied to that appointment.
+ *  2. The browser pays through Razorpay Checkout.
+ *  3. confirm (POST /api/patient/checkout/confirm) or the Razorpay webhook checks
+ *     the order with Razorpay and calls finalizeBooking(). Whichever runs first
+ *     confirms the appointment; the other is a no-op.
  */
 import { prisma } from '@/lib/db';
 import { PublicError } from '@/lib/api-error';
@@ -127,12 +127,34 @@ export async function finalizeBooking(
     include: { payment: true },
   });
   if (!appointment || !appointment.payment) return false;
+  if (appointment.status === 'CONFIRMED') return false;
   const couponId = coupon?.couponId || null;
   const discount = coupon?.discount || 0;
 
+  // A payment can complete after the patient closed checkout and the hold was
+  // released. Re-confirm it if the slot is still free; otherwise record it so
+  // the admin team can refund it.
+  if (appointment.payment.status === 'FAILED') {
+    const clash = await prisma.appointment.findFirst({
+      where: { id: { not: appointmentId }, doctorId: appointment.doctorId, scheduledAt: appointment.scheduledAt, status: 'CONFIRMED' },
+      select: { id: true },
+    });
+    if (clash) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: appointment.patientId,
+          action: 'PAYMENT_NEEDS_REFUND',
+          targetUserId: appointment.doctorId,
+          metadata: JSON.stringify({ appointmentId, paidAmount, reason: 'Paid after the slot was released and rebooked' }),
+        },
+      });
+      return false;
+    }
+  }
+
   const transitioned = await prisma.$transaction(async (tx) => {
     const updated = await tx.payment.updateMany({
-      where: { appointmentId, status: 'PENDING' },
+      where: { appointmentId, status: { in: ['PENDING', 'FAILED'] } },
       data: { status: 'SUCCESS', amount: paidAmount, commission: Math.round(paidAmount * COMMISSION_RATE * 100) / 100 },
     });
     if (updated.count === 0) return false;

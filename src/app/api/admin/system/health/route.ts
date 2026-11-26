@@ -38,24 +38,21 @@ export async function GET() {
       overallStatus = 'DOWN';
     }
 
-    // 2. Stripe API Check
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (stripeKey && stripeKey.startsWith('sk_test_')) {
-      checks.stripe = {
+    // 2. Razorpay payment gateway check
+    const rzpKey = process.env.RAZORPAY_KEY_ID;
+    if (rzpKey && process.env.RAZORPAY_KEY_SECRET && (rzpKey.startsWith('rzp_test_') || rzpKey.startsWith('rzp_live_'))) {
+      checks.payments = {
         status: 'UP',
-        mode: 'TEST',
+        provider: 'Razorpay',
+        mode: rzpKey.startsWith('rzp_live_') ? 'LIVE' : 'TEST',
         configured: true,
-      };
-    } else if (stripeKey && stripeKey.startsWith('sk_live_')) {
-      checks.stripe = {
-        status: 'UP',
-        mode: 'LIVE',
-        configured: true,
+        webhook: !!process.env.RAZORPAY_WEBHOOK_SECRET,
       };
     } else {
-      checks.stripe = {
+      checks.payments = {
         status: 'DEGRADED',
-        error: 'Missing or mock Stripe key',
+        provider: 'Razorpay',
+        error: 'Razorpay keys are not configured',
         configured: false,
       };
       if (overallStatus !== 'DOWN') overallStatus = 'DEGRADED';

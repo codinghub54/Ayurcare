@@ -95,7 +95,7 @@ const FAQS = [
   },
   {
     q: 'How do payments work?',
-    a: 'Each physician sets their own consultation fee, which you see before you book. Payments are processed by Stripe, so your card details are handled by Stripe and are not stored on AyurCare.',
+    a: 'Each physician sets their own consultation fee, which you see before you book. Payments are processed securely by Razorpay (cards, UPI, netbanking and wallets), so your payment details are handled by Razorpay and are not stored on AyurCare.',
   },
   {
     q: 'Can I get a copy of my data?',

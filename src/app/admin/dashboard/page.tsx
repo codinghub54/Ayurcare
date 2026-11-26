@@ -547,9 +547,9 @@ function AdminDashboardContent() {
                   </span>
                 </div>
                 <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
-                  <span className="text-xs text-slate-400 font-bold block uppercase">Stripe Payment Gateway</span>
-                  <span className={`text-lg font-bold flex items-center gap-1 mt-1 ${systemHealth.checks?.stripe?.status === 'UP' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    <CheckCircle className="w-4 h-4" /> {systemHealth.checks?.stripe?.status}
+                  <span className="text-xs text-slate-400 font-bold block uppercase">Razorpay Payment Gateway</span>
+                  <span className={`text-lg font-bold flex items-center gap-1 mt-1 ${systemHealth.checks?.payments?.status === 'UP' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    <CheckCircle className="w-4 h-4" /> {systemHealth.checks?.payments?.status}
                   </span>
                 </div>
                 <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">

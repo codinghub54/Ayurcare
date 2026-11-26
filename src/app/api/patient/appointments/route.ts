@@ -43,7 +43,7 @@ export async function GET() {
 
 /**
  * Retired: bookings are now created by POST /api/patient/checkout, which prices
- * the consultation on the server and ties it to a verified Stripe payment.
+ * the consultation on the server and ties it to a verified Razorpay payment.
  */
 export async function POST() {
   return NextResponse.json(

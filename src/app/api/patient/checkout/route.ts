@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
-import { getStripeClient } from '@/lib/stripe';
+import { createOrder, getRazorpayKeyId, RazorpayNotConfiguredError } from '@/lib/razorpay';
 import { apiError, PublicError } from '@/lib/api-error';
 import { CONSULT_TYPES, type ConsultType, assertSlotAvailable, quoteConsultation, finalizeBooking } from '@/lib/booking';
 
@@ -19,7 +19,7 @@ async function verifyPatient() {
 
 /**
  * Start checkout for a consultation: reserve the slot, price it on the server
- * and create the Stripe PaymentIntent the browser will pay.
+ * and create the Razorpay order the browser will pay through Razorpay Checkout.
  */
 export async function POST(request: Request) {
   let createdAppointmentId: string | null = null;
@@ -97,12 +97,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ appointmentId: appointment.id, free: true, ...quote });
     }
 
-    const paymentIntent = await getStripeClient().paymentIntents.create({
-      amount: Math.round(quote.total * 100), // paise
-      currency: 'inr',
-      automatic_payment_methods: { enabled: true },
-      description: 'AyurCare consultation',
-      metadata: {
+    const keyId = getRazorpayKeyId(); // throws a clear error if Razorpay is not configured
+    const amountPaise = Math.round(quote.total * 100);
+    const order = await createOrder({
+      amountPaise,
+      receipt: appointment.id,
+      notes: {
         appointmentId: appointment.id,
         patientId: patient.userId,
         doctorId,
@@ -113,18 +113,29 @@ export async function POST(request: Request) {
       },
     });
 
-    await prisma.payment.update({ where: { appointmentId: appointment.id }, data: { gatewayRefId: paymentIntent.id } });
+    await prisma.payment.update({ where: { appointmentId: appointment.id }, data: { gatewayRefId: order.id } });
+
+    const user = await prisma.user.findUnique({ where: { id: patient.userId }, select: { name: true, email: true, phone: true } });
 
     return NextResponse.json({
       appointmentId: appointment.id,
-      clientSecret: paymentIntent.client_secret,
       free: false,
       ...quote,
+      razorpay: {
+        keyId,
+        orderId: order.id,
+        amount: amountPaise,
+        currency: 'INR',
+        prefill: { name: user?.name || '', email: user?.email || '', contact: user?.phone || '' },
+      },
     });
   } catch (error) {
     // Never leave a reservation behind if payment setup failed
     if (createdAppointmentId) {
       await prisma.appointment.delete({ where: { id: createdAppointmentId } }).catch(() => {});
+    }
+    if (error instanceof RazorpayNotConfiguredError) {
+      return NextResponse.json({ error: 'Online payments are not set up yet. Please try again later.' }, { status: 503 });
     }
     return apiError(error, 'Could not start checkout. Please try again.');
   }

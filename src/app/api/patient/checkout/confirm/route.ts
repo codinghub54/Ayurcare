@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
-import { getStripeClient } from '@/lib/stripe';
 import { apiError } from '@/lib/api-error';
-import { finalizeBooking, cancelPendingBooking } from '@/lib/booking';
+import { finalizeBooking } from '@/lib/booking';
+import { getCapturedPaymentForOrder, verifyPaymentSignature } from '@/lib/razorpay';
 
 async function verifyPatient() {
   const cookieStore = await cookies();
@@ -16,9 +16,10 @@ async function verifyPatient() {
 }
 
 /**
- * Called by the booking screen after Stripe reports the card step finished.
- * Verifies the PaymentIntent directly with Stripe (never trusts the browser),
- * so bookings confirm even if the webhook is delayed or not configured.
+ * Called by the booking screen after Razorpay Checkout reports success.
+ * The browser's word is never trusted: the signature is checked when sent,
+ * and the order is always looked up with Razorpay to confirm it was paid
+ * the right amount before the booking is confirmed.
  */
 export async function POST(request: Request) {
   try {
@@ -35,28 +36,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Booking not found.' }, { status: 404 });
     }
     if (appointment.status === 'CONFIRMED') return NextResponse.json({ status: 'confirmed' });
-    if (!appointment.payment.gatewayRefId) {
-      return NextResponse.json({ error: 'Payment was not started for this booking.' }, { status: 400 });
+
+    const orderId = appointment.payment.gatewayRefId;
+    if (!orderId) return NextResponse.json({ error: 'Payment was not started for this booking.' }, { status: 400 });
+
+    // If Checkout sent a signature, it must be valid for this order
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+    if (razorpay_signature) {
+      const valid =
+        razorpay_order_id === orderId &&
+        typeof razorpay_payment_id === 'string' &&
+        verifyPaymentSignature(orderId, razorpay_payment_id, String(razorpay_signature));
+      if (!valid) return NextResponse.json({ error: 'Payment verification failed.' }, { status: 400 });
     }
 
-    const pi = await getStripeClient().paymentIntents.retrieve(appointment.payment.gatewayRefId);
-    if (pi.metadata?.appointmentId !== appointment.id || pi.metadata?.patientId !== patient.userId) {
-      return NextResponse.json({ error: 'Payment does not match this booking.' }, { status: 400 });
+    const paid = await getCapturedPaymentForOrder(orderId);
+    if (!paid) return NextResponse.json({ status: 'unpaid' });
+    const { payment, order } = paid;
+
+    const expectedPaise = Math.round(appointment.payment.amount * 100);
+    if (payment.amount !== expectedPaise || payment.order_id !== orderId) {
+      console.error('[checkout] amount mismatch', { appointmentId, expectedPaise, paid: payment.amount });
+      return NextResponse.json({ error: 'Payment amount does not match this booking.' }, { status: 400 });
     }
 
-    if (pi.status === 'succeeded') {
-      await finalizeBooking(appointment.id, pi.amount_received / 100, {
-        couponId: pi.metadata.couponId || null,
-        discount: Number(pi.metadata.discount) || 0,
-      });
-      return NextResponse.json({ status: 'confirmed' });
+    const confirmed = await finalizeBooking(appointment.id, payment.amount / 100, {
+      couponId: order.notes?.couponId || null,
+      discount: Number(order.notes?.discount) || 0,
+    });
+    if (!confirmed) {
+      const fresh = await prisma.appointment.findUnique({ where: { id: appointment.id }, select: { status: true } });
+      if (fresh?.status !== 'CONFIRMED') {
+        return NextResponse.json(
+          { error: 'Your payment was received, but this slot is no longer available. Our team will refund you shortly.' },
+          { status: 409 }
+        );
+      }
     }
-    if (pi.status === 'processing') return NextResponse.json({ status: 'processing' });
-    if (pi.status === 'canceled') {
-      await cancelPendingBooking(appointment.id);
-      return NextResponse.json({ status: 'cancelled' });
-    }
-    return NextResponse.json({ status: 'unpaid' });
+    return NextResponse.json({ status: 'confirmed' });
   } catch (error) {
     return apiError(error, 'Could not confirm your payment. If you were charged, your booking will update shortly.');
   }
