@@ -8,6 +8,7 @@
  * paid for without the patient's own confirmation.
  */
 import { prisma } from '@/lib/db';
+import { PENDING_HOLD_MINUTES } from '@/lib/booking';
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
@@ -169,7 +170,7 @@ async function findDoctors(query?: string) {
   return { count: list.length, doctors: list, note: list.length === 0 ? 'No approved doctors match. Offer to show all doctors.' : undefined };
 }
 
-async function getDoctorSlots(doctorId: string, date: string) {
+export async function getDoctorSlots(doctorId: string, date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'Date must be YYYY-MM-DD.' };
   const today = istDateString(new Date());
   const maxDay = istDateString(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
@@ -184,7 +185,14 @@ async function getDoctorSlots(doctorId: string, date: string) {
   const dayStart = new Date(`${date}T00:00:00+05:30`);
   const dayEnd = new Date(`${date}T23:59:59+05:30`);
   const booked = await prisma.appointment.findMany({
-    where: { doctorId, scheduledAt: { gte: dayStart, lte: dayEnd }, status: { in: ['PENDING', 'CONFIRMED'] } },
+    where: {
+      doctorId,
+      scheduledAt: { gte: dayStart, lte: dayEnd },
+      OR: [
+        { status: 'CONFIRMED' },
+        { status: 'PENDING', createdAt: { gte: new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000) } },
+      ],
+    },
     select: { scheduledAt: true },
   });
   const bookedTimes = new Set(

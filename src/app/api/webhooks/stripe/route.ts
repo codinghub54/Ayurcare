@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { getStripeClient } from '@/lib/stripe';
+import { finalizeBooking, cancelPendingBooking } from '@/lib/booking';
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -24,10 +25,7 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
     console.error('Webhook signature verification failed:', err.message);
-    return NextResponse.json(
-      { error: `Webhook signature verification failed: ${err.message}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 });
   }
 
   try {
@@ -38,7 +36,8 @@ export async function POST(request: Request) {
         break;
       }
 
-      case 'payment_intent.payment_failed': {
+      case 'payment_intent.payment_failed':
+      case 'payment_intent.canceled': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         await handlePaymentFailure(paymentIntent);
         break;
@@ -56,125 +55,30 @@ export async function POST(request: Request) {
   }
 }
 
-async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-  const { patientId, doctorId, scheduledAt } = paymentIntent.metadata;
-
-  // Find the payment record by the Stripe PaymentIntent ID
+/** Find the booking a PaymentIntent belongs to (metadata first, then stored reference). */
+async function appointmentIdFor(paymentIntent: Stripe.PaymentIntent): Promise<string | null> {
+  if (paymentIntent.metadata?.appointmentId) return paymentIntent.metadata.appointmentId;
   const payment = await prisma.payment.findFirst({
     where: { gatewayRefId: paymentIntent.id },
-    include: { appointment: true },
+    select: { appointmentId: true },
   });
+  return payment?.appointmentId ?? null;
+}
 
-  if (!payment) {
-    console.error(`No payment found for PaymentIntent ${paymentIntent.id}`);
+async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
+  const appointmentId = await appointmentIdFor(paymentIntent);
+  if (!appointmentId) {
+    console.error(`No booking found for PaymentIntent ${paymentIntent.id}`);
     return;
   }
-
-  if (payment.status === 'SUCCESS') {
-    // Already processed (idempotency guard)
-    return;
-  }
-
-  // Update payment and appointment in a transaction
-  await prisma.$transaction(async (tx: any) => {
-    // Mark payment as SUCCESS with the real Stripe amount
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: 'SUCCESS',
-        amount: paymentIntent.amount / 100, // Convert from paisa to rupees
-        commission: (paymentIntent.amount / 100) * 0.15,
-      },
-    });
-
-    // Confirm the appointment
-    await tx.appointment.update({
-      where: { id: payment.appointmentId },
-      data: { status: 'CONFIRMED' },
-    });
-
-    // Notify the doctor
-    if (doctorId) {
-      const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
-      await tx.notification.create({
-        data: {
-          userId: doctorId,
-          message: `New consultation confirmed for ${scheduledDate.toLocaleString()}. Payment verified.`,
-          type: 'APPOINTMENT',
-        },
-      });
-    }
+  // Idempotent: a no-op if the booking screen already confirmed it
+  await finalizeBooking(appointmentId, paymentIntent.amount_received / 100, {
+    couponId: paymentIntent.metadata?.couponId || null,
+    discount: Number(paymentIntent.metadata?.discount) || 0,
   });
-
-  // Send confirmation emails
-  try {
-    if (patientId && doctorId) {
-      const [patUser, docUser] = await Promise.all([
-        prisma.user.findUnique({ where: { id: patientId } }),
-        prisma.user.findUnique({ where: { id: doctorId } }),
-      ]);
-
-      if (patUser && docUser) {
-        const meetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://ayurcare-delta.vercel.app'}/meet/${payment.appointmentId}`;
-        const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
-
-        try {
-          const { sendAppointmentConfirmationEmail } = require('@/lib/email');
-          await sendAppointmentConfirmationEmail({
-            toEmail: patUser.email,
-            recipientName: patUser.name,
-            doctorName: docUser.name,
-            patientName: patUser.name,
-            scheduledAt: scheduledDate,
-            meetUrl,
-            isDoctor: false,
-          });
-          await sendAppointmentConfirmationEmail({
-            toEmail: docUser.email,
-            recipientName: docUser.name,
-            doctorName: docUser.name,
-            patientName: patUser.name,
-            scheduledAt: scheduledDate,
-            meetUrl,
-            isDoctor: true,
-          });
-        } catch (emailError) {
-          console.error('Failed to send confirmation emails:', emailError);
-        }
-      }
-    }
-  } catch (emailError) {
-    console.error('Failed to send confirmation emails:', emailError);
-  }
-
-  console.log(`Payment ${paymentIntent.id} succeeded — appointment ${payment.appointmentId} confirmed.`);
 }
 
 async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
-  const payment = await prisma.payment.findFirst({
-    where: { gatewayRefId: paymentIntent.id },
-  });
-
-  if (!payment) {
-    console.error(`No payment found for failed PaymentIntent ${paymentIntent.id}`);
-    return;
-  }
-
-  if (payment.status === 'FAILED') {
-    return; // Already processed
-  }
-
-  await prisma.$transaction(async (tx: any) => {
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: { status: 'FAILED' },
-    });
-
-    await tx.appointment.update({
-      where: { id: payment.appointmentId },
-      data: { status: 'CANCELLED' },
-    });
-  });
-
-  console.log(`Payment ${paymentIntent.id} failed — appointment ${payment.appointmentId} cancelled.`);
+  const appointmentId = await appointmentIdFor(paymentIntent);
+  if (appointmentId) await cancelPendingBooking(appointmentId);
 }

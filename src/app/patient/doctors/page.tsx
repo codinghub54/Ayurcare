@@ -1,33 +1,29 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Search, Star, ShieldCheck, Calendar, Clock, DollarSign, CheckCircle2, ShieldAlert } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, Search, Star, ShieldCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import BookingModal from '@/components/booking/BookingModal';
+
+type ConsultType = 'VIDEO' | 'AUDIO' | 'CHAT';
 
 export default function FindAndBookDoctor() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  // Pre-selection handed over by AyurBot: ?doctor=<id>&date=YYYY-MM-DD&time=HH:MM&type=VIDEO
-  const pendingTime = useRef<string | null>(searchParams.get('doctor') ? searchParams.get('time') : null);
-  const prefillApplied = useRef(false);
+  const router = useRouter();
 
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [specFilter, setSpecFilter] = useState('');
 
-  // Booking details modal
+  // Booking modal; prefill comes from AyurBot links: ?doctor=<id>&date=YYYY-MM-DD&time=HH:MM&type=VIDEO
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
-  const [apptType, setApptType] = useState<'CHAT' | 'AUDIO' | 'VIDEO'>('VIDEO');
-  
-  // Create a calendar selector: today or next 3 days
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState('');
-  const [bookingError, setBookingError] = useState('');
+  const [prefill, setPrefill] = useState<{ type?: ConsultType; date?: string; time?: string }>({});
+  const prefillApplied = useRef(false);
+
+  // Result after a bank/UPI redirect back from Stripe (?checkout=<appointmentId>)
+  const [returnStatus, setReturnStatus] = useState<'checking' | 'confirmed' | 'processing' | 'failed' | null>(null);
 
   const fetchDoctors = async () => {
     setLoading(true);
@@ -56,113 +52,40 @@ export default function FindAndBookDoctor() {
     const doc = doctors.find((d) => d.id === doctorId);
     if (!doc) return;
     const type = searchParams.get('type');
-    if (type === 'VIDEO' || type === 'AUDIO' || type === 'CHAT') setApptType(type);
-    const date = searchParams.get('date');
-    if (date && dateOptions.some((o) => o.isoString === date)) setSelectedDate(date);
+    setPrefill({
+      type: type === 'VIDEO' || type === 'AUDIO' || type === 'CHAT' ? type : undefined,
+      date: searchParams.get('date') || undefined,
+      time: searchParams.get('time') || undefined,
+    });
     setSelectedDoctor(doc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctors]);
 
-  // Set date choices: today + next 3 days
-  const dateOptions = Array.from({ length: 4 }).map((_, idx) => {
-    const d = new Date();
-    d.setDate(d.getDate() + idx);
-    return {
-      isoString: d.toLocaleDateString('en-CA'), // local YYYY-MM-DD (toISOString would use UTC)
-      displayString: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-    };
-  });
-
   useEffect(() => {
-    if (selectedDoctor) {
-      // Set default selected date
-      const defaultDate = dateOptions[0].isoString;
-      if (!selectedDate) setSelectedDate(defaultDate);
-
-      const isToday = (selectedDate || defaultDate) === dateOptions[0].isoString;
-
-      let slots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-      const profile = selectedDoctor.doctorProfile || {};
-      if (profile.availability) {
-        try {
-          const parsed = JSON.parse(profile.availability);
-          const recurring = parsed.recurring || {};
-          const dateObj = new Date(selectedDate || defaultDate);
-          const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-          const daySlots = recurring[weekday];
-          if (daySlots && daySlots.length > 0) {
-            const compiled: string[] = [];
-            daySlots.forEach((range: string) => {
-              const [start, end] = range.split('-');
-              const startHr = parseInt(start.split(':')[0]);
-              const endHr = parseInt(end.split(':')[0]);
-              for (let h = startHr; h < endHr; h++) {
-                compiled.push(`${String(h).padStart(2, '0')}:00`);
-              }
-            });
-            slots = compiled;
-          }
-        } catch (e) {}
+    const appointmentId = searchParams.get('checkout');
+    if (!appointmentId) return;
+    let cancelled = false;
+    (async () => {
+      setReturnStatus('checking');
+      try {
+        const res = await fetch('/api/patient/checkout/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appointmentId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        setReturnStatus(data.status === 'confirmed' ? 'confirmed' : data.status === 'processing' ? 'processing' : 'failed');
+      } catch {
+        if (!cancelled) setReturnStatus('failed');
       }
-
-      if (isToday) {
-        slots = ['NOW', ...slots];
-      }
-
-      setAvailableSlots(slots);
-      if (pendingTime.current && slots.includes(pendingTime.current)) {
-        setSelectedTimeSlot(pendingTime.current);
-        pendingTime.current = null;
-      } else {
-        setSelectedTimeSlot(slots[0] || 'NOW');
-      }
-    }
-  }, [selectedDoctor, selectedDate]);
-
-  const handleBookingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTimeSlot || !selectedDate) {
-      setBookingError('Please choose a date and time slot.');
-      return;
-    }
-
-    setBookingError('');
-    setBookingSuccess('');
-    setBookingLoading(true);
-
-    let scheduledAt = new Date().toISOString();
-    if (selectedTimeSlot !== 'NOW') {
-      scheduledAt = new Date(`${selectedDate}T${selectedTimeSlot}:00`).toISOString();
-    }
-
-    try {
-      const res = await fetch('/api/patient/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          doctorId: selectedDoctor.id,
-          scheduledAt,
-          type: apptType,
-          feePaid: selectedDoctor.doctorProfile?.feePerConsult || 500,
-        }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        setBookingSuccess('Checkout complete! Consultation scheduled.');
-        setTimeout(() => {
-          setSelectedDoctor(null);
-          router.push('/patient/dashboard');
-        }, 1500);
-      } else {
-        setBookingError(data.error || 'Failed to complete booking.');
-      }
-    } catch (err) {
-      setBookingError('Connection error.');
-    } finally {
-      setBookingLoading(false);
-    }
-  };
+      router.replace('/patient/doctors');
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredDoctors = doctors.filter((doc) => {
     const term = searchTerm.toLowerCase();
@@ -177,8 +100,30 @@ export default function FindAndBookDoctor() {
       {/* Header */}
       <div className="border-b border-slate-200 pb-6">
         <h1 className="font-display text-3xl font-extrabold tracking-wide text-slate-850">Book a Consultation</h1>
-        <p className="text-slate-500 text-sm mt-1">Consult certified Ayurvedic physicians online via secure video call.</p>
+        <p className="text-slate-500 text-sm mt-1">Consult approved Ayurvedic physicians online by video, audio or chat.</p>
       </div>
+
+      {returnStatus && (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 text-sm ${
+            returnStatus === 'failed' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            {returnStatus === 'checking' ? <Loader2 className="h-4 w-4 animate-spin" /> : returnStatus === 'failed' ? <ShieldAlert className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            {returnStatus === 'checking' && 'Checking your payment…'}
+            {returnStatus === 'confirmed' && 'Payment received. Your consultation is booked.'}
+            {returnStatus === 'processing' && 'Your payment is processing. The booking will confirm automatically.'}
+            {returnStatus === 'failed' && 'The payment was not completed, so no booking was made. You can try again.'}
+          </span>
+          {(returnStatus === 'confirmed' || returnStatus === 'processing') && (
+            <Link href="/patient/dashboard" className="font-semibold underline">
+              Go to dashboard
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border border-slate-100 rounded-xl p-5 shadow-sm items-end">
@@ -279,124 +224,18 @@ export default function FindAndBookDoctor() {
         </div>
       )}
 
-      {/* Booking Scheduling Modal */}
+      {/* Booking & payment */}
       {selectedDoctor && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-6">
-          <div className="bg-white rounded-xl border border-slate-100 max-w-md w-full p-8 shadow-2xl relative overflow-hidden text-left">
-            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary-700 via-gold-600 to-primary-700"></div>
-
-            <h3 className="font-display text-xl font-bold text-slate-800">Schedule: {selectedDoctor.name}</h3>
-            <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">
-              Consult Fee: ₹{selectedDoctor.doctorProfile?.feePerConsult || 500}
-            </span>
-
-            {bookingSuccess && (
-              <div className="bg-green-50 text-green-700 border border-green-200 p-3 rounded-lg text-xs font-bold text-center mt-4">
-                {bookingSuccess}
-              </div>
-            )}
-            {bookingError && (
-              <div className="bg-red-50 text-red-700 border border-red-200 p-3 rounded-lg text-xs font-bold text-center mt-4 flex items-center space-x-2">
-                <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                <span>{bookingError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleBookingSubmit} className="mt-6 space-y-4">
-              {/* Consult type */}
-              <div>
-                <label htmlFor="appt-type" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Consultation Mode</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['CHAT', 'AUDIO', 'VIDEO'] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setApptType(type)}
-                      className={`py-2 text-xs font-bold border rounded-lg transition cursor-pointer ${
-                        apptType === type 
-                          ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm' 
-                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date selection */}
-              <div>
-                <label htmlFor="appt-date" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Date</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {dateOptions.map((opt) => (
-                    <button
-                      key={opt.isoString}
-                      type="button"
-                      onClick={() => setSelectedDate(opt.isoString)}
-                      className={`py-2 px-1 text-xs font-bold border rounded-lg transition cursor-pointer ${
-                        selectedDate === opt.isoString 
-                          ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm' 
-                          : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      {opt.displayString}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Time slots */}
-              <div>
-                <label htmlFor="appt-slot" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Available Slots</label>
-                {availableSlots.length === 0 ? (
-                  <div className="text-xs text-red-500 font-semibold bg-red-50 border border-red-100 p-3 rounded-lg text-center">
-                    No consulting hours slots available for this date.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto p-1">
-                    {availableSlots.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setSelectedTimeSlot(slot)}
-                        className={`py-2 text-xs font-bold border rounded-lg transition cursor-pointer ${
-                          selectedTimeSlot === slot 
-                            ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm' 
-                            : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        {slot === 'NOW' ? '⚡ Instant (Now)' : slot}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Payment disclaimer */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-[10px] text-slate-500 font-medium leading-relaxed">
-                Stripe payment simulator will authorize <strong>₹{selectedDoctor.doctorProfile?.feePerConsult || 500}</strong>. All bookings are protected under the patient refund policies.
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDoctor(null)}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold rounded-lg text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={bookingLoading || availableSlots.length === 0}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg text-xs flex items-center cursor-pointer disabled:opacity-50"
-                >
-                  {bookingLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
-                  Authorize & Book
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <BookingModal
+          doctor={selectedDoctor}
+          initialType={prefill.type}
+          initialDate={prefill.date}
+          initialTime={prefill.time}
+          onClose={() => {
+            setSelectedDoctor(null);
+            setPrefill({});
+          }}
+        />
       )}
     </div>
   );

@@ -41,85 +41,13 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
-  try {
-    const patient = await verifyPatient();
-    if (!patient) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const body = await request.json();
-    const { doctorId, scheduledAt, type, familyMemberId, paymentIntentId } = body;
-
-    if (!doctorId || !scheduledAt || !type || !paymentIntentId) {
-      return NextResponse.json(
-        { error: 'Missing required fields: doctorId, scheduledAt, type, paymentIntentId' },
-        { status: 400 }
-      );
-    }
-
-    // Verify doctor is approved
-    const doctorProfile = await prisma.doctorProfile.findUnique({
-      where: { userId: doctorId },
-    });
-
-    if (!doctorProfile || !doctorProfile.isApproved) {
-      return NextResponse.json(
-        { error: 'This physician cannot accept consultations at this time.' },
-        { status: 400 }
-      );
-    }
-
-    const scheduledDate = new Date(scheduledAt);
-
-    // Create appointment as PENDING — it will be confirmed ONLY when the
-    // Stripe webhook receives a payment_intent.succeeded event.
-    const newAppointment = await prisma.$transaction(async (tx: any) => {
-      const appointment = await tx.appointment.create({
-        data: {
-          patientId: patient.userId,
-          doctorId,
-          familyMemberId: familyMemberId || null,
-          scheduledAt: scheduledDate,
-          type,
-          status: 'PENDING',
-          feePaid: doctorProfile.feePerConsult,
-        },
-      });
-
-      // Create payment record as PENDING — will be updated by webhook
-      const commission = doctorProfile.feePerConsult * 0.15;
-      await tx.payment.create({
-        data: {
-          appointmentId: appointment.id,
-          amount: doctorProfile.feePerConsult,
-          commission,
-          status: 'PENDING',
-          gatewayRefId: paymentIntentId,
-        },
-      });
-
-      return appointment;
-    });
-
-    // Write audit log
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: patient.userId,
-        action: 'PATIENT_BOOK_APPOINTMENT',
-        targetUserId: doctorId,
-        metadata: JSON.stringify({
-          appointmentId: newAppointment.id,
-          paymentIntentId,
-          status: 'PENDING',
-        }),
-      },
-    });
-
-    return NextResponse.json({
-      message: 'Appointment created. Awaiting payment confirmation.',
-      appointment: newAppointment,
-    });
-  } catch (error: any) {
-    console.error('Book appointment error:', error);
-    return apiError(error, 'An error occurred');
-  }
+/**
+ * Retired: bookings are now created by POST /api/patient/checkout, which prices
+ * the consultation on the server and ties it to a verified Stripe payment.
+ */
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Please book through the consultation booking screen.' },
+    { status: 410 }
+  );
 }
