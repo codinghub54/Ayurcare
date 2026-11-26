@@ -16,7 +16,7 @@ async function verifyPatient() {
 export async function POST(request: Request) {
   try {
     const patient = await verifyPatient();
-    if (!patient) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!patient) return NextResponse.json({ error: 'Please sign in to a patient account to save your Prakriti.' }, { status: 401 });
 
     const body = await request.json();
     const { answers } = body; // answers is { bodyFrame, skinType, appetite, sleep, temperament, digest, voice, weatherPref }
@@ -64,16 +64,16 @@ export async function POST(request: Request) {
       lifestyle = {};
     }
 
-    await prisma.patientProfile.update({
+    const lifestyleData = JSON.stringify({
+      ...lifestyle,
+      scores: { vata, pitta, kapha },
+      lastQuizDate: new Date().toISOString(),
+    });
+    // upsert: older accounts may not have a patient profile row yet
+    await prisma.patientProfile.upsert({
       where: { userId: patient.userId },
-      data: {
-        doshaType,
-        lifestyleData: JSON.stringify({
-          ...lifestyle,
-          scores: { vata, pitta, kapha },
-          lastQuizDate: new Date().toISOString(),
-        }),
-      },
+      update: { doshaType, lifestyleData },
+      create: { userId: patient.userId, doshaType, lifestyleData },
     });
 
     // Write audit log

@@ -136,3 +136,73 @@ function synthesizeGenerativeAyurvedicResponse(userPrompt: string): string {
 
   return `Hello! Regarding your query about *"${text}"*:\n\nPhysical symptoms reflect an imbalance among your **Three Biological Energies (Vata, Pitta, Kapha)**:\n1. **Vata:** Controls movement & nerve impulses.\n2. **Pitta:** Controls metabolism & body heat.\n3. **Kapha:** Controls lubrication & mass.\n\nRebalance digestive fire (*Agni*) with warm Cumin-Coriander-Fennel tea and light freshly cooked meals.`;
 }
+
+/**
+ * Multi-turn chat completion (used by AyurBot).
+ * Sends the full conversation and a system instruction to the first configured
+ * provider. Returns null when no provider is configured or all providers fail,
+ * so callers can tell the user the assistant is unavailable instead of
+ * returning canned text.
+ */
+export async function generateChatCompletion(
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  systemPrompt: string
+): Promise<{ text: string; provider: string } | null> {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (geminiKey && geminiKey.length > 5 && !geminiKey.includes('mock')) {
+    const models = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.0-flash'];
+    const contents = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+    for (const model of models) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const text = json.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('');
+          if (text) return { text, provider: `gemini:${model}` };
+        }
+      } catch (e) {
+        console.warn(`[ayurbot] Gemini ${model} failed`, e);
+      }
+    }
+  }
+
+  const openAiCompatible: { key?: string; url: string; model: string; name: string }[] = [
+    { key: process.env.GROQ_API_KEY, url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', name: 'groq' },
+    { key: process.env.OPENAI_API_KEY, url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', name: 'openai' },
+  ];
+  for (const p of openAiCompatible) {
+    if (!p.key || p.key.length <= 5 || p.key.includes('mock')) continue;
+    try {
+      const res = await fetch(p.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${p.key}` },
+        body: JSON.stringify({
+          model: p.model,
+          temperature: 0.6,
+          max_tokens: 1024,
+          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const text = json.choices?.[0]?.message?.content;
+        if (text) return { text, provider: p.name };
+      }
+    } catch (e) {
+      console.warn(`[ayurbot] ${p.name} failed`, e);
+    }
+  }
+
+  return null;
+}

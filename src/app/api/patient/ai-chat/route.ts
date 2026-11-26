@@ -44,8 +44,9 @@ export async function POST(request: Request) {
 
     let session;
     if (sessionId) {
-      session = await prisma.aIChatSession.findUnique({
-        where: { id: sessionId },
+      // Only allow continuing the patient's own chat session
+      session = await prisma.aIChatSession.findFirst({
+        where: { id: sessionId, patientId: patient.userId },
       });
     }
 

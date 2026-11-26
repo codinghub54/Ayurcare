@@ -16,8 +16,7 @@ import {
   Flower2,
   User,
   Sparkles,
-  Activity,
-  ClipboardList,
+  Leaf,
 } from 'lucide-react';
 import PortalShell, { type PortalNavGroup } from '@/components/portal/PortalShell';
 import { PortalLoading, PortalNotice } from '@/components/portal/PortalStatus';
@@ -35,9 +34,8 @@ const NAV: PortalNavGroup[] = [
   {
     title: 'AI tools',
     items: [
+      { href: '/patient/ayurbot', label: 'AyurBot', icon: Leaf },
       { href: '/patient/ai-chat', label: 'PrakritiAI assistant', icon: Bot },
-      { href: '/patient/analyzer', label: 'Report analyser', icon: Activity },
-      { href: '/patient/quiz', label: 'Prakriti quiz', icon: ClipboardList },
     ],
   },
   {

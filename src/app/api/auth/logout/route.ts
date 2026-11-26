@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { clearAuthCookies, revokeCurrentRefreshToken } from '@/lib/jwt';
 
 export async function POST() {
   try {
-    const cookieStore = await cookies();
-    cookieStore.delete('accessToken');
-    cookieStore.delete('refreshToken');
-
-    return NextResponse.json({
-      message: 'Logged out successfully',
-    });
-  } catch (error: any) {
-    console.error('Logout error:', error);
-    return NextResponse.json({ error: 'An error occurred during logout' }, { status: 500 });
+    await revokeCurrentRefreshToken();
+  } catch (error) {
+    // Still clear cookies even if the database is unreachable
+    console.error('Logout revoke error:', error);
   }
+  await clearAuthCookies();
+  return NextResponse.json({ message: 'Logged out successfully' });
 }

@@ -14,6 +14,11 @@ const EMERGENCY_KEYWORDS = [
   'paralysis', 'unconscious', 'severe burn', 'heavy bleeding'
 ];
 
+/** True when the text mentions symptoms that need emergency care rather than AI advice. */
+export function isEmergencyMessage(text: string): boolean {
+  return EMERGENCY_KEYWORDS.some((keyword) => new RegExp(`\\b${keyword}\\b`, 'i').test(text));
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;

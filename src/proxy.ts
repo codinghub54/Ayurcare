@@ -1,17 +1,34 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
 
-function decodeJwt(token: string): any {
+/** Verify the access token's signature and expiry (proxy runs on the Node.js runtime). */
+function decodeJwt(token: string): { role?: string; status?: string; [k: string]: unknown } | null {
+  const secret = process.env.JWT_SECRET;
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch (e) {
+    // Without a secret (misconfigured env) fall back to reading the payload so the
+    // guard cannot loop; API routes still verify every token themselves.
+    const decoded = secret ? jwt.verify(token, secret) : jwt.decode(token);
+    return decoded && typeof decoded === 'object' ? (decoded as { role?: string; status?: string }) : null;
+  } catch {
     return null;
   }
 }
+
+const PUBLIC_PORTAL_PATHS = new Set([
+  '/admin/login',
+  '/doctor/login',
+  '/doctor/signup',
+  '/doctor/pending',
+  '/doctor/verify-otp',
+  '/doctor/forgot-password',
+  '/doctor/reset-password',
+  '/patient/login',
+  '/patient/signup',
+  '/patient/verify-otp',
+  '/patient/forgot-password',
+  '/patient/reset-password',
+]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,6 +38,14 @@ export function proxy(request: NextRequest) {
 
   // Decode access token payload
   const user = accessToken ? decodeJwt(accessToken) : null;
+
+  // Access tokens are short-lived. If it has expired but a refresh token is
+  // present, renew the session and come straight back to the requested page.
+  if (!user && request.cookies.get('refreshToken')?.value && !PUBLIC_PORTAL_PATHS.has(pathname)) {
+    const refreshUrl = new URL('/api/auth/refresh', request.url);
+    refreshUrl.searchParams.set('next', pathname + request.nextUrl.search);
+    return NextResponse.redirect(refreshUrl);
+  }
 
   // Admin routes protection
   if (pathname.startsWith('/admin')) {
