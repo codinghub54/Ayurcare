@@ -16,6 +16,7 @@ import {
   IndianRupee,
   MessagesSquare,
   LockKeyhole,
+  FlaskConical,
 } from 'lucide-react';
 import PortalShell, { type PortalNavGroup } from '@/components/portal/PortalShell';
 import { PortalLoading, PortalNotice } from '@/components/portal/PortalStatus';
@@ -48,6 +49,7 @@ const NAV: PortalNavGroup[] = [
       { href: '/admin/dashboard?tab=ops', label: 'Feature flags & health', icon: ToggleRight },
       { href: '/admin/dashboard?tab=analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/admin/tickets', label: 'Support tickets', icon: Ticket },
+      { href: '/admin/test-calls', label: 'Test consultations', icon: FlaskConical },
     ],
   },
 ];

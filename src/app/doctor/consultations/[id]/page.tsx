@@ -17,7 +17,8 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useConsultationRoom, type MedicineItem, type Report } from '@/components/consultation/useConsultationRoom';
-import CallStage from '@/components/consultation/CallStage';
+import MeetingStage from '@/components/call/MeetingStage';
+import { useLocalMedia } from '@/components/call/useLocalMedia';
 import ChatPanel from '@/components/consultation/ChatPanel';
 
 type Tab = 'rx' | 'summary' | 'private' | 'history';
@@ -40,6 +41,11 @@ function fmt(iso: string) {
 export default function DoctorConsultationRoom({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const room = useConsultationRoom(id);
+  const media = useLocalMedia(room.data?.appointment.type === 'VIDEO');
+  // Keep the call pointed at the latest camera/mic state
+  useEffect(() => {
+    room.call.attachMedia(media);
+  });
   const { data } = room;
 
   const [tab, setTab] = useState<Tab>('rx');
@@ -240,7 +246,9 @@ export default function DoctorConsultationRoom({ params }: { params: Promise<{ i
       <div className="grid gap-5 xl:grid-cols-12">
         {/* Call + chat */}
         <div className="space-y-5 xl:col-span-7">
-          <CallStage
+          <MeetingStage
+            selfName={data.appointment.doctor.name}
+            media={media}
             type={data.appointment.type}
             peerName={ctx?.name || data.appointment.patient.name}
             peerRoleLabel="Patient"

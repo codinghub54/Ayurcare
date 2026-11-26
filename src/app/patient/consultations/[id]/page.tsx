@@ -4,7 +4,8 @@ import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, AlertCircle, CheckCircle2, Pill, ClipboardList, FileText, WifiOff, ArrowLeft, Radio } from 'lucide-react';
 import { useConsultationRoom } from '@/components/consultation/useConsultationRoom';
-import CallStage from '@/components/consultation/CallStage';
+import MeetingStage from '@/components/call/MeetingStage';
+import { useLocalMedia } from '@/components/call/useLocalMedia';
 import ChatPanel from '@/components/consultation/ChatPanel';
 import { SummaryReport, PrescriptionReport } from '@/components/consultation/ReportView';
 
@@ -15,6 +16,11 @@ function fmt(iso: string) {
 export default function PatientConsultationRoom({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const room = useConsultationRoom(id);
+  const media = useLocalMedia(room.data?.appointment.type === 'VIDEO');
+  // Keep the call pointed at the latest camera/mic state
+  useEffect(() => {
+    room.call.attachMedia(media);
+  });
   const { data, liveReport } = room;
   const [tab, setTab] = useState<'rx' | 'summary'>('rx');
   // Show "Doctor is writing…" for a few seconds after each change from the doctor
@@ -88,7 +94,9 @@ export default function PatientConsultationRoom({ params }: { params: Promise<{ 
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-7">
-          <CallStage
+          <MeetingStage
+            selfName={data.appointment.patient.name}
+            media={media}
             type={data.appointment.type}
             peerName={doctorName}
             peerRoleLabel="Your physician"

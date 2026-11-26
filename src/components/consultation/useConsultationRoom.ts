@@ -10,9 +10,17 @@
  * reconnects never mix up offers.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { LocalMedia } from '@/components/call/useLocalMedia';
 
 export type ConsultType = 'VIDEO' | 'AUDIO' | 'CHAT';
 export type CallState = 'idle' | 'starting' | 'waiting' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+export type CallQuality = 'good' | 'fair' | 'poor' | 'unknown';
+/** What the other participant is doing, shared over the call's data channel. */
+export interface PeerMediaState {
+  mic: boolean | null;
+  cam: boolean | null;
+  sharing: boolean;
+}
 
 export interface MedicineItem {
   name: string;
@@ -98,15 +106,18 @@ export function useConsultationRoom(appointmentId: string) {
 
   const [callState, setCallState] = useState<CallState>('idle');
   const [callError, setCallError] = useState('');
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [remoteState, setRemoteState] = useState<PeerMediaState>({ mic: null, cam: null, sharing: false });
+  const [quality, setQuality] = useState<CallQuality>('unknown');
+  const [route, setRoute] = useState<'direct' | 'relay' | null>(null);
 
   const dataRef = useRef<RoomData | null>(null);
   const inCallRef = useRef(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const localRef = useRef<MediaStream | null>(null);
+  const mediaRef = useRef<LocalMedia | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  const statsTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastInbound = useRef<{ lost: number; received: number } | null>(null);
   const sessionRef = useRef<string | null>(null);
   const pendingIce = useRef<RTCIceCandidateInit[]>([]);
   const lastMsgAt = useRef<string | null>(null);
@@ -137,6 +148,16 @@ export function useConsultationRoom(appointmentId: string) {
     const pc = pcRef.current;
     pcRef.current = null;
     pendingIce.current = [];
+    if (statsTimer.current) clearInterval(statsTimer.current);
+    statsTimer.current = null;
+    lastInbound.current = null;
+    try {
+      dcRef.current?.close();
+    } catch {}
+    dcRef.current = null;
+    setRemoteState({ mic: null, cam: null, sharing: false });
+    setQuality('unknown');
+    setRoute(null);
     if (pc) {
       pc.onicecandidate = null;
       pc.ontrack = null;
@@ -148,6 +169,79 @@ export function useConsultationRoom(appointmentId: string) {
     setRemoteStream(null);
   }, []);
 
+  /** Tell the other side our mic / camera / screen-share state. */
+  const sendState = useCallback(() => {
+    const m = mediaRef.current;
+    const dc = dcRef.current;
+    if (!m || !dc || dc.readyState !== 'open') return;
+    try {
+      dc.send(JSON.stringify({ t: 'state', mic: m.micOn, cam: m.camOn, sharing: m.sharing }));
+    } catch {}
+  }, []);
+
+  const attachDataChannel = useCallback(
+    (dc: RTCDataChannel) => {
+      dcRef.current = dc;
+      dc.onopen = () => sendState();
+      dc.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(String(ev.data));
+          if (msg.t === 'state') setRemoteState({ mic: !!msg.mic, cam: !!msg.cam, sharing: !!msg.sharing });
+        } catch {}
+      };
+    },
+    [sendState]
+  );
+
+  /** Put our current tracks on the connection's senders (no renegotiation needed). */
+  const syncSenders = useCallback((pc: RTCPeerConnection) => {
+    const m = mediaRef.current;
+    if (!m) return;
+    for (const tx of pc.getTransceivers()) {
+      const kind = tx.receiver.track?.kind;
+      if (kind === 'audio') tx.sender.replaceTrack(m.audioTrack()).catch(() => {});
+      if (kind === 'video') tx.sender.replaceTrack(m.videoTrack()).catch(() => {});
+      if (tx.direction === 'recvonly' || tx.direction === 'inactive') tx.direction = 'sendrecv';
+    }
+  }, []);
+
+  /** Round-trip time and packet loss every 2 s, summarised as good / fair / poor. */
+  const startStats = useCallback((pc: RTCPeerConnection) => {
+    if (statsTimer.current) clearInterval(statsTimer.current);
+    statsTimer.current = setInterval(async () => {
+      if (pcRef.current !== pc) return;
+      try {
+        const report = await pc.getStats();
+        let rtt: number | null = null;
+        let lost = 0;
+        let received = 0;
+        let relay = false;
+        const byId = new Map<string, RTCStats & Record<string, unknown>>();
+        report.forEach((r) => byId.set(r.id, r as RTCStats & Record<string, unknown>));
+        report.forEach((r) => {
+          const s = r as RTCStats & Record<string, unknown>;
+          if (s.type === 'candidate-pair' && s.state === 'succeeded' && (s.nominated || s.selected)) {
+            if (typeof s.currentRoundTripTime === 'number') rtt = s.currentRoundTripTime;
+            const local = byId.get(String(s.localCandidateId));
+            if (local?.candidateType === 'relay') relay = true;
+          }
+          if (s.type === 'inbound-rtp') {
+            lost += Number(s.packetsLost || 0);
+            received += Number(s.packetsReceived || 0);
+          }
+        });
+        const prev = lastInbound.current;
+        lastInbound.current = { lost, received };
+        const dLost = prev ? Math.max(0, lost - prev.lost) : 0;
+        const dRecv = prev ? Math.max(0, received - prev.received) : 0;
+        const loss = dLost + dRecv > 0 ? dLost / (dLost + dRecv) : 0;
+        setRoute(relay ? 'relay' : 'direct');
+        const r = rtt ?? 0;
+        setQuality(r < 0.3 && loss < 0.02 ? 'good' : r < 0.7 && loss < 0.08 ? 'fair' : 'poor');
+      } catch {}
+    }, 2000);
+  }, []);
+
   const buildPc = useCallback(
     (session: string) => {
       closePc();
@@ -155,12 +249,17 @@ export function useConsultationRoom(appointmentId: string) {
       const pc = new RTCPeerConnection({ iceServers: dataRef.current?.iceServers || [] });
       pcRef.current = pc;
 
-      localRef.current?.getTracks().forEach((t) => pc.addTrack(t, localRef.current!));
-      // Make sure we can receive media even if we are not sending that kind
+      // The doctor's side defines the media lines: one audio and (for video calls) one video,
+      // both send+receive. Tracks are swapped on these senders for mute, device changes and
+      // screen sharing, so the connection never needs renegotiating mid-call.
       const type = dataRef.current?.appointment.type;
+      const m = mediaRef.current;
       if (isDoctor()) {
-        if (!localRef.current?.getAudioTracks().length) pc.addTransceiver('audio', { direction: 'recvonly' });
-        if (type === 'VIDEO' && !localRef.current?.getVideoTracks().length) pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver(m?.audioTrack() || 'audio', { direction: 'sendrecv' });
+        if (type === 'VIDEO') pc.addTransceiver(m?.videoTrack() || 'video', { direction: 'sendrecv' });
+        attachDataChannel(pc.createDataChannel('meta', { ordered: true }));
+      } else {
+        pc.ondatachannel = (ev) => attachDataChannel(ev.channel);
       }
 
       const remote = new MediaStream();
@@ -175,7 +274,10 @@ export function useConsultationRoom(appointmentId: string) {
       pc.onconnectionstatechange = () => {
         if (pcRef.current !== pc) return;
         const s = pc.connectionState;
-        if (s === 'connected') setCallState('connected');
+        if (s === 'connected') {
+          setCallState('connected');
+          startStats(pc);
+        }
         else if (s === 'connecting' || s === 'new') setCallState((c) => (c === 'connected' ? 'reconnecting' : 'connecting'));
         else if (s === 'disconnected') setCallState('reconnecting');
         else if (s === 'failed') {
@@ -193,7 +295,7 @@ export function useConsultationRoom(appointmentId: string) {
       };
       return pc;
     },
-    [closePc, sendSignal]
+    [closePc, sendSignal, attachDataChannel, startStats]
   );
 
   const doctorOffer = useCallback(async () => {
@@ -249,6 +351,7 @@ export function useConsultationRoom(appointmentId: string) {
           let pc = pcRef.current;
           if (!pc || payload.session !== sessionRef.current) pc = buildPc(payload.session || newSession());
           await pc.setRemoteDescription(payload.sdp);
+          syncSenders(pc);
           await flushIce(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -275,7 +378,7 @@ export function useConsultationRoom(appointmentId: string) {
         }
       }
     },
-    [buildPc, closePc, doctorOffer, sendSignal]
+    [buildPc, closePc, doctorOffer, sendSignal, syncSenders]
   );
 
   /* ---------------- bootstrap + sync loop ---------------- */
@@ -363,31 +466,24 @@ export function useConsultationRoom(appointmentId: string) {
 
   /* ---------------- call controls ---------------- */
 
-  const joinCall = useCallback(async () => {
-    const d = dataRef.current;
-    if (!d || d.appointment.type === 'CHAT') return;
-    setCallError('');
-    setCallState('starting');
-    try {
-      const wantVideo = d.appointment.type === 'VIDEO';
-      const audio = { echoCancellation: true, noiseSuppression: true };
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio,
-          video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
-        });
-      } catch (err) {
-        // No usable camera: join a video consultation with audio only rather than not at all
-        const name = (err as { name?: string })?.name;
-        if (!wantVideo || name === 'NotAllowedError') throw err;
-        stream = await navigator.mediaDevices.getUserMedia({ audio });
-        setCallError('Your camera is not available, so you joined with audio only.');
-      }
-      localRef.current = stream;
-      setLocalStream(stream);
-      setMicOn(true);
-      setCamOn(stream.getVideoTracks().length > 0);
+  /**
+   * Join the call with media already started in the pre-join lobby.
+   * Track changes (mute, device switch, screen share) flow to the connection live.
+   */
+  const joinCall = useCallback(
+    async (media: LocalMedia) => {
+      const d = dataRef.current;
+      if (!d || d.appointment.type === 'CHAT') return;
+      setCallError('');
+      mediaRef.current = media;
+      media.onTrackChange.current = (kind, track) => {
+        const pc = pcRef.current;
+        if (pc) {
+          for (const tx of pc.getTransceivers()) {
+            if (tx.receiver.track?.kind === kind) tx.sender.replaceTrack(track).catch(() => {});
+          }
+        }
+      };
       inCallRef.current = true;
       setCallState('waiting');
 
@@ -401,43 +497,22 @@ export function useConsultationRoom(appointmentId: string) {
         sessionRef.current = null;
         await sendSignal('hello', {}, true);
       }
-    } catch (e) {
-      inCallRef.current = false;
-      setCallState('error');
-      const name = (e as { name?: string })?.name;
-      setCallError(
-        name === 'NotAllowedError'
-          ? 'Camera or microphone permission was blocked. Allow it in your browser settings and try again.'
-          : name === 'NotFoundError'
-            ? 'No camera or microphone was found on this device.'
-            : 'Could not start your camera or microphone.'
-      );
-    }
-  }, [closePc, doctorOffer, sendSignal]);
+    },
+    [closePc, doctorOffer, sendSignal]
+  );
 
   const leaveCall = useCallback(() => {
     if (inCallRef.current) sendSignal('bye', {});
     inCallRef.current = false;
     closePc();
     sessionRef.current = null;
-    localRef.current?.getTracks().forEach((t) => t.stop());
-    localRef.current = null;
-    setLocalStream(null);
+    if (mediaRef.current) mediaRef.current.onTrackChange.current = null;
     setCallState('idle');
   }, [closePc, sendSignal]);
 
-  const toggleMic = useCallback(() => {
-    const track = localRef.current?.getAudioTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    setMicOn(track.enabled);
-  }, []);
-
-  const toggleCam = useCallback(() => {
-    const track = localRef.current?.getVideoTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    setCamOn(track.enabled);
+  /** Keep the call pointed at the latest local-media state (called on every render). */
+  const attachMedia = useCallback((m: LocalMedia) => {
+    mediaRef.current = m;
   }, []);
 
   // Leave cleanly when the page closes or the component unmounts
@@ -450,7 +525,7 @@ export function useConsultationRoom(appointmentId: string) {
       window.removeEventListener('pagehide', onUnload);
       if (inCallRef.current) sendSignal('bye', {});
       inCallRef.current = false;
-      localRef.current?.getTracks().forEach((t) => t.stop());
+      if (statsTimer.current) clearInterval(statsTimer.current);
       pcRef.current?.close();
     };
   }, [sendSignal]);
@@ -503,7 +578,18 @@ export function useConsultationRoom(appointmentId: string) {
     messages,
     liveReport,
     connectionLost,
-    call: { state: callState, error: callError, localStream, remoteStream, micOn, camOn, join: joinCall, leave: leaveCall, toggleMic, toggleCam },
+    call: {
+      state: callState,
+      error: callError,
+      remoteStream,
+      remoteState,
+      quality,
+      route,
+      join: joinCall,
+      leave: leaveCall,
+      sendState,
+      attachMedia,
+    },
     sendMessage,
   };
 }
