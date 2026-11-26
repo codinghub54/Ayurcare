@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -29,45 +30,46 @@ export async function POST(request: Request) {
     let pitta = 0;
     let kapha = 0;
 
-    // Evaluate each answer value
+    // Each answer value is the dosha it points to ("vata" | "pitta" | "kapha").
+    // Anything else is ignored rather than silently counted.
     Object.values(answers).forEach((ans: any) => {
       const val = String(ans).toLowerCase();
-      if (val === 'vata' || val === 'a' || val.includes('light') || val.includes('dry') || val.includes('irregular') || val.includes('anxious')) {
-        vata++;
-      } else if (val === 'pitta' || val === 'b' || val.includes('medium') || val.includes('warm') || val.includes('strong') || val.includes('sharp') || val.includes('ambitious')) {
-        pitta++;
-      } else if (val === 'kapha' || val === 'c' || val.includes('heavy') || val.includes('thick') || val.includes('steady') || val.includes('deep') || val.includes('calm')) {
-        kapha++;
-      } else {
-        // Fallback random distribution to ensure score is calculated
-        vata++;
-      }
+      if (val === 'vata') vata++;
+      else if (val === 'pitta') pitta++;
+      else if (val === 'kapha') kapha++;
     });
 
-    // Determine dominance
-    let doshaType = '';
-    const maxVal = Math.max(vata, pitta, kapha);
-
-    if (maxVal === vata && vata === pitta) {
-      doshaType = 'VATA_PITTA';
-    } else if (maxVal === vata && vata === kapha) {
-      doshaType = 'VATA_KAPHA';
-    } else if (maxVal === pitta && pitta === kapha) {
-      doshaType = 'PITTA_KAPHA';
-    } else if (maxVal === vata) {
-      doshaType = 'VATA';
-    } else if (maxVal === pitta) {
-      doshaType = 'PITTA';
-    } else {
-      doshaType = 'KAPHA';
+    if (vata + pitta + kapha === 0) {
+      return NextResponse.json({ error: 'No valid answers were submitted' }, { status: 400 });
     }
 
-    // Save calculation to DB PatientProfile
-    const updatedProfile = await prisma.patientProfile.update({
+    // Determine dominance (ties produce dual or tri-doshic types)
+    const maxVal = Math.max(vata, pitta, kapha);
+    const dominant = [
+      vata === maxVal ? 'VATA' : null,
+      pitta === maxVal ? 'PITTA' : null,
+      kapha === maxVal ? 'KAPHA' : null,
+    ].filter(Boolean) as string[];
+    const doshaType = dominant.length === 3 ? 'TRIDOSHA' : dominant.join('_');
+
+    // Merge into existing lifestyle data so wellness logs and other fields are preserved
+    const existing = await prisma.patientProfile.findUnique({
+      where: { userId: patient.userId },
+      select: { lifestyleData: true },
+    });
+    let lifestyle: Record<string, any> = {};
+    try {
+      lifestyle = existing?.lifestyleData ? JSON.parse(existing.lifestyleData) : {};
+    } catch {
+      lifestyle = {};
+    }
+
+    await prisma.patientProfile.update({
       where: { userId: patient.userId },
       data: {
         doshaType,
         lifestyleData: JSON.stringify({
+          ...lifestyle,
           scores: { vata, pitta, kapha },
           lastQuizDate: new Date().toISOString(),
         }),
@@ -90,6 +92,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Prakriti quiz error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
@@ -75,6 +76,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Reset password error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

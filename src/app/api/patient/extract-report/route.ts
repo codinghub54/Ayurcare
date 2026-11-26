@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -80,6 +81,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Extraction error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to extract text' }, { status: 500 });
+    return apiError(error, 'Failed to extract text');
   }
 }

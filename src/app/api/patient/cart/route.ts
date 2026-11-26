@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ items });
   } catch (error: any) {
     console.error('Fetch cart error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, item: newItem });
   } catch (error: any) {
     console.error('Add to cart error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -96,6 +97,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true, message: 'Cart cleared successfully' });
   } catch (error: any) {
     console.error('Clear cart error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

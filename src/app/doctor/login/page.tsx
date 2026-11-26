@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Eye, EyeOff, Loader2, Stethoscope } from 'lucide-react';
+import AuthShell, { authInput, authLabel, authPrimaryButton } from '@/components/auth/AuthShell';
 
 function DoctorLoginContent() {
   const { login } = useAuth();
@@ -14,7 +15,6 @@ function DoctorLoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -145,60 +145,34 @@ function DoctorLoginContent() {
   };
 
   return (
-    <main className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-cream" id="doctor-login-page">
-      {/* Visual Side */}
-      <section className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-primary-800 to-primary-700 text-white relative overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary-600 rounded-full opacity-20 filter blur-3xl"></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-gold-600 rounded-full opacity-20 filter blur-3xl"></div>
-        
-        <div className="flex items-center space-x-2 z-10">
-          <div className="w-10 h-10 rounded-xl bg-gold-600 flex items-center justify-center font-bold text-lg text-primary-850">
-            VS
-          </div>
-          <span className="font-display font-bold text-2xl tracking-wide">VedaSync</span>
-        </div>
-
-        <div className="my-auto z-10 max-w-md">
-          <div className="flex items-center space-x-2 text-gold-100 font-semibold mb-3">
-            <Stethoscope className="w-5 h-5 text-gold-600" />
-            <span>Physician Portal</span>
-          </div>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold leading-tight mb-6">
-            Partner in Healing & Wellbeing.
-          </h1>
-          <p className="text-primary-100 text-lg">
-            Consult patients, write structured Ayurvedic prescriptions, and view medical histories instantly inside the patient 360 viewer.
-          </p>
-        </div>
-
-        <div className="text-sm text-primary-100 opacity-70 z-10">
-          &copy; 2026 VedaSync AI Health. All rights reserved.
-        </div>
-      </section>
-
-      {/* Form Side */}
-      <section className="flex items-center justify-center p-8 lg:p-16">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-8 lg:p-10 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary-700 via-gold-600 to-primary-700"></div>
-
-          <div className="mb-8">
-            <h2 className="font-display text-2xl lg:text-3xl font-bold text-slate-800 font-display">
-              {forgotPasswordMode ? 'Reset Credentials' : 'Doctor Portal Login'}
+    <AuthShell
+      eyebrow="Physician portal"
+      headline="Your online Ayurvedic practice, in one workspace."
+      points={[
+        "Today's consultation queue at a glance",
+        'Patient history and Prakriti before each call',
+        'Structured digital prescriptions',
+      ]}
+    >
+      <div id="doctor-login-page">
+          <div className="mb-7">
+            <h2 className="font-display text-3xl font-semibold text-ink">
+              {forgotPasswordMode ? 'Reset your password' : 'Physician sign in'}
             </h2>
-            <p className="text-slate-500 mt-2">
-              {forgotPasswordMode 
-                ? 'Follow the steps to reset your medical practice credentials.' 
-                : 'Welcome, Doctor. Access your clinic appointments queue.'}
+            <p className="mt-2 text-ink-muted">
+              {forgotPasswordMode
+                ? 'Follow the steps to reset your password.'
+                : 'Access your consultation queue, schedule and patients.'}
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 p-3.5 rounded-lg border border-red-200 text-sm mb-6 font-medium leading-relaxed">
+            <div className="bg-red-50 text-red-700 p-3 rounded-xl border border-red-200 text-sm mb-6 font-medium leading-relaxed">
               {error}
             </div>
           )}
           {resetSuccess && (
-            <div className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 text-sm mb-6 font-medium">
+            <div className="bg-emerald-50 text-emerald-800 p-3 rounded-xl border border-emerald-200 text-sm mb-6 font-medium">
               {resetSuccess}
             </div>
           )}
@@ -207,21 +181,21 @@ function DoctorLoginContent() {
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
               {resetStep === 1 ? (
                 <div>
-                  <label htmlFor="reset-email" className="block text-sm font-semibold text-slate-700 mb-2">Registered Email Address</label>
+                  <label htmlFor="reset-email" className={authLabel}>Registered Email Address</label>
                   <input
                     id="reset-email"
                     type="email"
                     required
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="doctor@email.com"
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400 text-sm"
+                    placeholder="you@example.com"
+                    className={`${authInput}`}
                   />
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="reset-code" className="block text-sm font-semibold text-slate-700 mb-2">6-Digit OTP Code</label>
+                    <label htmlFor="reset-code" className={authLabel}>6-Digit OTP Code</label>
                     <input
                       id="reset-code"
                       type="text"
@@ -230,11 +204,11 @@ function DoctorLoginContent() {
                       value={resetCode}
                       onChange={(e) => setResetCode(e.target.value)}
                       placeholder="Enter code"
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 tracking-widest text-center text-lg font-bold placeholder-slate-400"
+                      className={`${authInput} tracking-widest text-center text-lg font-bold placeholder-slate-400`}
                     />
                   </div>
                   <div>
-                    <label htmlFor="new-password" className="block text-sm font-semibold text-slate-700 mb-2">New Secure Password</label>
+                    <label htmlFor="new-password" className={authLabel}>New Secure Password</label>
                     <input
                       id="new-password"
                       type="password"
@@ -242,7 +216,7 @@ function DoctorLoginContent() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="8+ chars (1 number, 1 symbol)"
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400 text-sm"
+                      className={`${authInput}`}
                     />
                   </div>
                 </div>
@@ -251,7 +225,7 @@ function DoctorLoginContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md text-sm"
+                className={authPrimaryButton}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
                 {resetStep === 1 ? 'Send Verification OTP' : 'Reset My Password'}
@@ -264,7 +238,7 @@ function DoctorLoginContent() {
                   setResetStep(1);
                   setError('');
                 }}
-                className="w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition"
+                className="w-full text-center text-sm font-semibold text-forest hover:underline cursor-pointer"
               >
                 Back to Login
               </button>
@@ -272,15 +246,15 @@ function DoctorLoginContent() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="email-field" className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
+                <label htmlFor="email-field" className={authLabel}>Email Address</label>
                 <input
                   id="email-field"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="doctor@ayurcare.com"
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400 text-sm"
+                  placeholder="you@example.com"
+                  className={`${authInput}`}
                 />
               </div>
 
@@ -290,7 +264,7 @@ function DoctorLoginContent() {
                   <button
                     type="button"
                     onClick={() => setForgotPasswordMode(true)}
-                    className="text-sm font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition"
+                    className="text-sm font-semibold text-forest hover:underline cursor-pointer"
                   >
                     Forgot password?
                   </button>
@@ -303,7 +277,7 @@ function DoctorLoginContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400 text-sm pr-10"
+                    className={`${authInput} pr-10`}
                   />
                   <button
                     type="button"
@@ -315,48 +289,38 @@ function DoctorLoginContent() {
                 </div>
               </div>
 
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500 cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 text-sm text-slate-600 font-medium cursor-pointer selection:bg-transparent">
-                  Remember me
-                </label>
-              </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md text-sm"
+                className={authPrimaryButton}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                Login as Doctor
+                Sign in
               </button>
 
               <div className="text-center text-sm font-medium text-slate-600 mt-6">
-                Don't have a practice account?{' '}
-                <Link href="/doctor/signup" className="text-primary-600 font-bold hover:text-primary-700 underline transition">
-                  Apply to Consult
+                Not on AyurCare yet?{' '}
+                <Link href="/doctor/signup" className="text-forest font-semibold hover:underline">
+                  Apply as a physician
                 </Link>
               </div>
             </form>
           )}
-        </div>
-      </section>
-    </main>
+          <div className="mt-8 rounded-2xl border border-line bg-white p-4 text-sm text-ink-muted">
+            Looking for patient care?{' '}
+            <Link href="/patient/login" className="font-semibold text-forest hover:underline">
+              Patient sign in
+            </Link>
+          </div>
+      </div>
+    </AuthShell>
   );
 }
 
 export default function DoctorLogin() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-cream text-primary-800 font-semibold">
-        Loading form...
-      </div>
+      <div className="min-h-screen flex items-center justify-center bg-bg text-sm text-ink-muted">Loading…</div>
     }>
       <DoctorLoginContent />
     </Suspense>

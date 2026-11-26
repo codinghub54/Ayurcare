@@ -30,7 +30,7 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
 
   try {
     const info = await transporter.sendMail({
-      from: `"VedaSync AI" <${SMTP_FROM_EMAIL}>`,
+      from: `"AyurCare" <${SMTP_FROM_EMAIL}>`,
       to,
       subject,
       text: text || subject,
@@ -47,17 +47,17 @@ async function sendEmail({ to, subject, html, text }: { to: string; subject: str
 export async function sendOtpEmail(toEmail: string, otpCode: string) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
-      <h2 style="color: #166534; text-align: center;">Verify Your VedaSync Account</h2>
-      <p style="font-size: 16px; color: #333;">Thank you for registering with VedaSync. Please use the following 6-digit One-Time Password (OTP) to verify your account. This code is valid for 10 minutes.</p>
+      <h2 style="color: #166534; text-align: center;">Verify Your AyurCare Account</h2>
+      <p style="font-size: 16px; color: #333;">Thank you for registering with AyurCare. Please use the following 6-digit One-Time Password (OTP) to verify your account. This code is valid for 10 minutes.</p>
       <div style="background-color: #f5f5f4; padding: 15px; text-align: center; border-radius: 6px; margin: 25px 0;">
         <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #166534;">${otpCode}</span>
       </div>
       <p style="font-size: 14px; color: #666; text-align: center;">If you did not request this code, please ignore this email.</p>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'Verify your VedaSync account', html });
+  return sendEmail({ to: toEmail, subject: 'Verify your AyurCare account', html });
 }
 
 export async function sendAdminLoginOtpEmail(toEmail: string, otpCode: string) {
@@ -74,43 +74,43 @@ export async function sendAdminLoginOtpEmail(toEmail: string, otpCode: string) {
         </div>
         <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">This code will expire in <strong>10 minutes</strong>. If you did not initiate this login, someone may be attempting to access your account. Please change your password immediately.</p>
       </div>
-      <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 25px;">AyurCare Telemedicine Platform &bull; Automated Security Protocol</p>
+      <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 25px;">AyurCare &bull; Automated Security Protocol</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: `AyurCare Admin 2FA Code: ${otpCode}`, html });
+  return sendEmail({ to: toEmail, subject: `AyurCare admin sign-in code: ${otpCode}`, html });
 }
 
 export async function sendResetPasswordEmail(toEmail: string, resetLinkOrOtp: string) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
       <h2 style="color: #166534; text-align: center;">Reset Your Password</h2>
-      <p style="font-size: 16px; color: #333;">We received a request to reset the password for your VedaSync account. Use the following OTP to reset your password. This code will expire in 15 minutes.</p>
+      <p style="font-size: 16px; color: #333;">We received a request to reset the password for your AyurCare account. Use the following OTP to reset your password. This code will expire in 15 minutes.</p>
       <div style="background-color: #f5f5f4; padding: 15px; text-align: center; border-radius: 6px; margin: 25px 0;">
         <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #166534;">${resetLinkOrOtp}</span>
       </div>
       <p style="font-size: 14px; color: #666; text-align: center;">If you did not make this request, please change your password immediately to protect your account.</p>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'Reset your VedaSync password', html });
+  return sendEmail({ to: toEmail, subject: 'Reset your AyurCare password', html });
 }
 
 export async function sendWelcomeEmail(toEmail: string, userName: string) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
-      <h2 style="color: #166534; text-align: center;">Welcome to VedaSync!</h2>
+      <h2 style="color: #166534; text-align: center;">Welcome to AyurCare!</h2>
       <p style="font-size: 16px; color: #333;">Namaste <strong>${userName}</strong>,</p>
-      <p style="font-size: 16px; color: #333;">Welcome to VedaSync, your gateway to traditional Ayurvedic wisdom and modern telemedicine. Your account is now active!</p>
+      <p style="font-size: 16px; color: #333;">Welcome to AyurCare, your gateway to traditional Ayurvedic wisdom and modern telemedicine. Your account is now active!</p>
       <p style="font-size: 16px; color: #333;">You can now log in, schedule consultations with verified Ayurvedic physicians, assess your Prakriti (Dosha), and converse with our AI wellness assistant.</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="http://localhost:3000" style="background-color: #166534; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Dashboard</a>
       </div>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'Welcome to VedaSync', html });
+  return sendEmail({ to: toEmail, subject: 'Welcome to AyurCare', html });
 }
 
 export async function sendDoctorApprovalEmail(toEmail: string, doctorName: string) {
@@ -118,16 +118,16 @@ export async function sendDoctorApprovalEmail(toEmail: string, doctorName: strin
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
       <h2 style="color: #166534; text-align: center;">Application Verified Successfully</h2>
       <p style="font-size: 16px; color: #333;">Dear <strong>Dr. ${doctorName}</strong>,</p>
-      <p style="font-size: 16px; color: #333;">Congratulations! Your credentials have been successfully reviewed and verified by our administrative team. Your VedaSync Doctor Portal is now fully unlocked.</p>
+      <p style="font-size: 16px; color: #333;">Congratulations! Your credentials have been successfully reviewed and verified by our administrative team. Your AyurCare Doctor Portal is now fully unlocked.</p>
       <p style="font-size: 16px; color: #333;">You can now log in to set your weekly availability slots, view upcoming bookings, and consult patients.</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="http://localhost:3000/doctor/login" style="background-color: #166534; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log in to Doctor Portal</a>
       </div>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'VedaSync Doctor Profile Approved!', html });
+  return sendEmail({ to: toEmail, subject: 'AyurCare Doctor Profile Approved!', html });
 }
 
 export async function sendDoctorRejectionEmail(toEmail: string, doctorName: string, reason: string) {
@@ -135,17 +135,17 @@ export async function sendDoctorRejectionEmail(toEmail: string, doctorName: stri
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
       <h2 style="color: #c2410c; text-align: center;">Application Status Update</h2>
       <p style="font-size: 16px; color: #333;">Dear <strong>Dr. ${doctorName}</strong>,</p>
-      <p style="font-size: 16px; color: #333;">We regret to inform you that your application to practice on the VedaSync platform could not be approved at this time.</p>
+      <p style="font-size: 16px; color: #333;">We regret to inform you that your application to practice on the AyurCare platform could not be approved at this time.</p>
       <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <strong style="color: #991b1b;">Rejection Reason:</strong>
         <p style="margin: 5px 0 0 0; color: #7f1d1d;">${reason}</p>
       </div>
       <p style="font-size: 16px; color: #333;">You may re-submit your verification documents or contact support for further clarification.</p>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'VedaSync Application Update', html });
+  return sendEmail({ to: toEmail, subject: 'AyurCare Application Update', html });
 }
 
 export async function sendPrescriptionReadyEmail(toEmail: string, patientName: string, doctorName: string) {
@@ -159,10 +159,10 @@ export async function sendPrescriptionReadyEmail(toEmail: string, patientName: s
         <a href="http://localhost:3000/patient/dashboard" style="background-color: #166534; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Prescriptions</a>
       </div>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
-  return sendEmail({ to: toEmail, subject: 'Your VedaSync Prescription is Ready', html });
+  return sendEmail({ to: toEmail, subject: 'Your AyurCare Prescription is Ready', html });
 }
 
 export async function sendAppointmentConfirmationEmail({
@@ -193,7 +193,7 @@ export async function sendAppointmentConfirmationEmail({
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #faf7f0;">
-      <h2 style="color: #166534; text-align: center;">VedaSync Consultation Confirmed</h2>
+      <h2 style="color: #166534; text-align: center;">AyurCare Consultation Confirmed</h2>
       <p style="font-size: 16px; color: #333;">Namaste <strong>${recipientName}</strong>,</p>
       <p style="font-size: 16px; color: #333;">
         ${isDoctor 
@@ -204,7 +204,7 @@ export async function sendAppointmentConfirmationEmail({
       <div style="background-color: #f5f5f4; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 14px; color: #166534; font-weight: bold; line-height: 1.6;">
         📅 Scheduled Time: ${dateStr}<br/>
         ⏱️ Duration: 1 Hour 30 Minutes (Strict 90 Mins)<br/>
-        📹 Platform: VedaSync Encrypted Video Portal
+        📹 Platform: AyurCare Encrypted Video Portal
       </div>
 
       <p style="font-size: 15px; color: #333;">
@@ -216,13 +216,13 @@ export async function sendAppointmentConfirmationEmail({
       </div>
 
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
-      <p style="font-size: 12px; color: #999; text-align: center;">VedaSync Telemedicine Portal &copy; 2026</p>
+      <p style="font-size: 12px; color: #999; text-align: center;">AyurCare Telemedicine Portal &copy; 2026</p>
     </div>
   `;
 
   return sendEmail({
     to: toEmail,
-    subject: `VedaSync Consultation Confirmed: ${new Date(scheduledAt).toLocaleDateString()}`,
+    subject: `AyurCare Consultation Confirmed: ${new Date(scheduledAt).toLocaleDateString()}`,
     html
   });
 }

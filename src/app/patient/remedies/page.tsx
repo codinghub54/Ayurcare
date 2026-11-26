@@ -26,7 +26,9 @@ import { useSearchParams } from 'next/navigation';
 
 export default function HerbRemedies() {
   const searchParams = useSearchParams();
-  const urlDosha = searchParams.get('dosha');
+  // Accept ?dosha=VATA, ?dosha=vata or ?dosha=Vata
+  const rawUrlDosha = searchParams.get('dosha');
+  const urlDosha = rawUrlDosha ? rawUrlDosha.charAt(0).toUpperCase() + rawUrlDosha.slice(1).toLowerCase() : null;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDoshaFilter, setSelectedDoshaFilter] = useState<'All' | 'Vata' | 'Pitta' | 'Kapha'>(
@@ -94,9 +96,9 @@ export default function HerbRemedies() {
             <BookOpen className="w-7 h-7 text-gold-200" />
           </div>
           <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-wide">5,100+ Ayurvedic Herb Remedies Directory</h1>
+            <h1 className="font-display text-3xl font-extrabold tracking-wide">Ayurvedic Herb Directory</h1>
             <p className="text-emerald-100 text-sm mt-1">
-              Explore 5,100+ genuine Ayurvedic pharmacopoeia preparations, botanical lineages, and Dosha-balancing matches.
+              Classical Ayurvedic herbs with their taste (rasa), potency (virya), dosha effects, common formulations and precautions.
             </p>
           </div>
         </div>
@@ -109,7 +111,7 @@ export default function HerbRemedies() {
           <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
           <input
             type="text"
-            placeholder="Search across 5,100+ herbs, formulations, or ailments..."
+            placeholder="Search herbs, formulations or conditions (e.g. ashwagandha, sleep, digestion)..."
             value={searchQuery}
             onChange={handleSearchChange}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
@@ -128,7 +130,7 @@ export default function HerbRemedies() {
                   : 'hover:bg-slate-200 text-slate-700'
               }`}
             >
-              {dosha === 'All' ? 'Show All (5,100+)' : `${dosha} Balancer`}
+              {dosha === 'All' ? 'All herbs' : `${dosha} balancing`}
             </button>
           ))}
         </div>
@@ -144,7 +146,7 @@ export default function HerbRemedies() {
       {loading ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-500 flex flex-col items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-2" />
-          <span className="text-sm font-bold">Querying 5,100+ Ayurvedic Herb Remedies...</span>
+          <span className="text-sm font-bold">Loading herbs...</span>
         </div>
       ) : herbs.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-500">

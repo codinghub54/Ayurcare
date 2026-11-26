@@ -4,7 +4,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import AuthShell, { authInput, authLabel, authPrimaryButton } from '@/components/auth/AuthShell';
 
 declare global {
   interface Window {
@@ -13,99 +14,34 @@ declare global {
 }
 
 function PatientLoginContent() {
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
-  
-  // Forgot password flow states
+
+  // Forgot password flow
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [resetStep, setResetStep] = useState(1); // 1: enter email, 2: enter code & new pass
+  const [resetStep, setResetStep] = useState(1); // 1: enter email, 2: enter code & new password
   const [resetUserId, setResetUserId] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
 
-  // Check for redirected errors (like suspension)
   useEffect(() => {
-    const errorQuery = searchParams.get('error');
-    if (errorQuery === 'suspended') {
-      setError('Account suspended: Please contact AyurCare support for assistance.');
+    if (searchParams.get('error') === 'suspended') {
+      setError('Your account has been suspended. Please contact AyurCare support for help.');
     }
   }, [searchParams]);
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const isMockGoogle = !googleClientId || googleClientId === 'mock_client_id';
-
-  // Load Google Identity Services script and render the button (only if client_id is real)
-  useEffect(() => {
-    if (isMockGoogle) return;
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-
-    script.onload = () => {
-      if (window.google) {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: handleGoogleLoginSuccess,
-        });
-
-        const btnContainer = document.getElementById('google-signin-btn-container');
-        if (btnContainer) {
-          window.google.accounts.id.renderButton(btnContainer, {
-            theme: 'outline',
-            size: 'large',
-            width: btnContainer.clientWidth || 380,
-          });
-        }
-      }
-    };
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, [isMockGoogle, googleClientId]);
-
-  // Listen for Google Mock Login popups (only active if client_id is mock)
-  useEffect(() => {
-    if (!isMockGoogle) return;
-
-    const handleGoogleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'GOOGLE_LOGIN_SUCCESS') {
-        const { user: googleUser } = event.data;
-        if (googleUser) {
-          login(googleUser);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleGoogleMessage);
-    return () => window.removeEventListener('message', handleGoogleMessage);
-  }, [isMockGoogle, login]);
-
-  const handleGoogleMockClick = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    window.open(
-      '/auth/google-mock',
-      'Google Login Selection',
-      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
-    );
-  };
+  const googleEnabled = !!googleClientId && googleClientId !== 'mock_client_id';
 
   const handleGoogleLoginSuccess = async (response: any) => {
     setLoading(true);
@@ -117,30 +53,62 @@ function PatientLoginContent() {
         body: JSON.stringify({ credential: response.credential }),
       });
       const data = await res.json();
-
       if (res.ok) {
         login(data.user);
       } else {
-        setError(data.error || 'Google login verification failed.');
+        setError(data.error || 'Google sign-in failed.');
       }
-    } catch (err) {
-      setError('Connection error during Google Authentication.');
+    } catch {
+      setError('Could not reach the server during Google sign-in.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Load Google Identity Services and render the official button (only when configured)
+  useEffect(() => {
+    if (!googleEnabled || forgotPasswordMode) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    script.onload = () => {
+      if (!window.google) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleLoginSuccess,
+      });
+      const container = document.getElementById('google-signin-btn-container');
+      if (container) {
+        window.google.accounts.id.renderButton(container, {
+          theme: 'outline',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          width: Math.min(container.clientWidth || 380, 400),
+        });
+      }
+    };
+
+    return () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleEnabled, googleClientId, forgotPasswordMode]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    // Client-side validation
+
     if (!email || !email.includes('@')) {
-      setError('Invalid email format');
+      setError('Please enter a valid email address.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Password must be at least 6 characters.');
       return;
     }
 
@@ -155,15 +123,12 @@ function PatientLoginContent() {
 
       if (res.ok) {
         login(data.user);
+      } else if (data.unverified) {
+        router.push(`/patient/verify-otp?userId=${data.userId}`);
       } else {
-        if (data.unverified) {
-          // If email is not verified, redirect to OTP verification
-          router.push(`/patient/verify-otp?userId=${data.userId}`);
-        } else {
-          setError(data.error || 'Incorrect email or password');
-        }
+        setError(data.error || 'Incorrect email or password.');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to connect to the server. Please try again.');
     } finally {
       setLoading(false);
@@ -177,7 +142,7 @@ function PatientLoginContent() {
 
     if (resetStep === 1) {
       if (!resetEmail || !resetEmail.includes('@')) {
-        setError('Please enter a valid email address');
+        setError('Please enter a valid email address.');
         return;
       }
       setLoading(true);
@@ -190,302 +155,250 @@ function PatientLoginContent() {
         const data = await res.json();
         if (res.ok) {
           setResetUserId(data.userId);
-          setResetSuccess('Reset code sent! Check your inbox.');
+          setResetSuccess('We sent a reset code to your email.');
           setResetStep(2);
         } else {
-          setError(data.error || 'Error sending code.');
+          setError(data.error || 'Could not send the reset code.');
         }
-      } catch (err) {
+      } catch {
         setError('Server error. Please try again.');
       } finally {
         setLoading(false);
       }
-    } else {
-      if (!resetCode || !newPassword) {
-        setError('All fields are required');
-        return;
+      return;
+    }
+
+    if (!resetCode || !newPassword) {
+      setError('Please enter the code and a new password.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: resetUserId, code: resetCode, newPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResetSuccess('Password updated. You can sign in now.');
+        setTimeout(() => {
+          setForgotPasswordMode(false);
+          setResetStep(1);
+          setResetCode('');
+          setNewPassword('');
+          setResetSuccess('');
+        }, 2500);
+      } else {
+        setError(data.error || 'That code is not valid.');
       }
-      if (newPassword.length < 8) {
-        setError('Password must be at least 8 characters');
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: resetUserId, code: resetCode, newPassword }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setResetSuccess('Password reset successfully! You can now log in.');
-          setTimeout(() => {
-            setForgotPasswordMode(false);
-            setResetStep(1);
-            setResetEmail('');
-            setResetCode('');
-            setNewPassword('');
-            setResetSuccess('');
-          }, 3000);
-        } else {
-          setError(data.error || 'Invalid reset code');
-        }
-      } catch (err) {
-        setError('Server error.');
-      } finally {
-        setLoading(false);
-      }
+    } catch {
+      setError('Server error. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-cream" id="patient-login-page">
-      {/* Visual Side */}
-      <section className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-primary-800 to-primary-700 text-white relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary-600 rounded-full opacity-20 filter blur-3xl"></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-gold-600 rounded-full opacity-20 filter blur-3xl"></div>
-        
-        {/* Brand Header */}
-        <div className="flex items-center space-x-2 z-10">
-          <div className="w-10 h-10 rounded-xl bg-gold-600 flex items-center justify-center font-bold text-lg text-primary-850">
-            VS
-          </div>
-          <span className="font-display font-bold text-2xl tracking-wide">VedaSync</span>
-        </div>
-
-        {/* Brand Quote */}
-        <div className="my-auto z-10 max-w-md">
-          <div className="flex items-center space-x-2 text-gold-100 font-semibold mb-3">
-            <Sparkles className="w-5 h-5 text-gold-600" />
-            <span>Ayurvedic Healing Portal</span>
-          </div>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold leading-tight mb-6">
-            Your Journey to True Balance Begins Here.
-          </h1>
-          <p className="text-primary-100 text-lg">
-            Consult verified physicians, track your Prakriti (Dosha), and manage prescriptions online in a secure environment.
-          </p>
-        </div>
-
-        {/* Footer info */}
-        <div className="text-sm text-primary-100 opacity-70 z-10">
-          &copy; 2026 VedaSync AI Health. All rights reserved.
-        </div>
-      </section>
-
-      {/* Form Side */}
-      <section className="flex items-center justify-center p-8 lg:p-16">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 p-8 lg:p-10 relative overflow-hidden">
-          
-          {/* Top border indicator */}
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary-700 via-gold-600 to-primary-700"></div>
-
-          {/* Heading */}
-          <div className="mb-8">
-            <h2 className="font-display text-2xl lg:text-3xl font-bold text-slate-800">
-              {forgotPasswordMode ? 'Reset Password' : 'Patient Portal Login'}
-            </h2>
-            <p className="text-slate-500 mt-2">
-              {forgotPasswordMode 
-                ? 'Follow the steps to securely reset your credentials.' 
-                : 'Welcome back. Access your health records and doctors.'}
-            </p>
-          </div>
-
-          {/* Alert messages */}
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm mb-6 font-medium animate-pulse">
-              {error}
-            </div>
-          )}
-          {resetSuccess && (
-            <div className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 text-sm mb-6 font-medium">
-              {resetSuccess}
-            </div>
-          )}
-
-          {/* Form */}
+    <AuthShell
+      eyebrow="Patient portal"
+      headline="Welcome back to your path to balance."
+      points={[
+        'See upcoming consultations and join video calls',
+        'Review prescriptions and lab reports',
+        'Pick up your yoga, diet and breathing routines',
+      ]}
+    >
+      <div id="patient-login-page">
+        <h2 className="font-display text-3xl font-semibold text-ink">
+          {forgotPasswordMode ? 'Reset your password' : 'Sign in'}
+        </h2>
+        <p className="mt-2 text-ink-muted">
           {forgotPasswordMode ? (
-            <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
-              {resetStep === 1 ? (
-                <div>
-                  <label htmlFor="reset-email" className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
-                  <input
-                    id="reset-email"
-                    type="email"
-                    required
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="Enter your registered email"
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="reset-code" className="block text-sm font-semibold text-slate-700 mb-2">6-Digit OTP Code</label>
-                    <input
-                      id="reset-code"
-                      type="text"
-                      required
-                      maxLength={6}
-                      value={resetCode}
-                      onChange={(e) => setResetCode(e.target.value)}
-                      placeholder="Enter 6-digit code"
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 tracking-widest text-center text-lg font-bold placeholder-slate-400"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="new-password" className="block text-sm font-semibold text-slate-700 mb-2">New Secure Password</label>
-                    <input
-                      id="new-password"
-                      type="password"
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Minimum 8 characters (1 number, 1 symbol)"
-                      className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md"
-              >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                {resetStep === 1 ? 'Send Verification OTP' : 'Reset My Password'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setForgotPasswordMode(false);
-                  setResetStep(1);
-                  setError('');
-                }}
-                className="w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition"
-              >
-                Back to Login
-              </button>
-            </form>
+            resetStep === 1 ? (
+              "Enter the email you registered with and we'll send you a code."
+            ) : (
+              'Enter the code from your email and choose a new password.'
+            )
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <>
+              New to AyurCare?{' '}
+              <Link href="/patient/signup" className="font-semibold text-forest hover:underline">
+                Create an account
+              </Link>
+            </>
+          )}
+        </p>
+
+        {error && (
+          <div role="alert" className="mt-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        {resetSuccess && (
+          <div role="status" className="mt-6 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{resetSuccess}</span>
+          </div>
+        )}
+
+        {forgotPasswordMode ? (
+          <form onSubmit={handleForgotPasswordSubmit} className="mt-7 space-y-4">
+            {resetStep === 1 ? (
               <div>
-                <label htmlFor="email-field" className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
+                <label htmlFor="reset-email" className={authLabel}>Email</label>
                 <input
-                  id="email-field"
+                  id="reset-email"
                   type="email"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="patient@email.com"
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400"
+                  autoComplete="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={authInput}
                 />
               </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label htmlFor="password-field" className="text-sm font-semibold text-slate-700">Password</label>
-                  <button
-                    type="button"
-                    onClick={() => setForgotPasswordMode(true)}
-                    className="text-sm font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div className="relative">
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="reset-code" className={authLabel}>6-digit code</label>
                   <input
-                    id="password-field"
-                    type={showPassword ? 'text' : 'password'}
+                    id="reset-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                     required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 placeholder-slate-400 pr-10"
+                    maxLength={6}
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                    className={`${authInput} text-center text-lg font-semibold tracking-[0.5em]`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
                 </div>
-              </div>
+                <div>
+                  <label htmlFor="new-password" className={authLabel}>New password</label>
+                  <input
+                    id="new-password"
+                    type="password"
+                    required
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    className={authInput}
+                  />
+                </div>
+              </>
+            )}
 
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500 cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 text-sm text-slate-600 font-medium cursor-pointer selection:bg-transparent">
-                  Remember me
-                </label>
-              </div>
+            <button type="submit" disabled={loading} className={`${authPrimaryButton} !mt-6`}>
+              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              {resetStep === 1 ? 'Send reset code' : 'Reset password'}
+            </button>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md"
-              >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                Login to Portal
-              </button>
+            <button
+              type="button"
+              onClick={() => {
+                setForgotPasswordMode(false);
+                setResetStep(1);
+                setError('');
+                setResetSuccess('');
+              }}
+              className="w-full text-center text-sm font-semibold text-forest hover:underline cursor-pointer"
+            >
+              Back to sign in
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            <div>
+              <label htmlFor="email-field" className={authLabel}>Email</label>
+              <input
+                id="email-field"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className={authInput}
+              />
+            </div>
 
-              {/* Google OAuth */}
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">Or</span>
-                <div className="flex-grow border-t border-slate-200"></div>
-              </div>
-
-              {isMockGoogle ? (
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="password-field" className="text-sm font-semibold text-ink">Password</label>
                 <button
                   type="button"
-                  onClick={handleGoogleMockClick}
-                  className="w-full py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg transition duration-200 flex items-center justify-center cursor-pointer shadow-sm"
+                  onClick={() => {
+                    setForgotPasswordMode(true);
+                    setResetEmail(email);
+                    setError('');
+                  }}
+                  className="text-sm font-semibold text-forest hover:underline cursor-pointer"
                 >
-                  <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.86 3C6.29 7.74 8.92 5.04 12 5.04z" />
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.01 3.67-8.65z" />
-                    <path fill="#FBBC05" d="M5.36 14.5c-.25-.74-.39-1.53-.39-2.35s.14-1.61.39-2.35L1.5 6.8C.54 8.71 0 10.84 0 13s.54 4.29 1.5 6.2l3.86-3.7z" />
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.76-2.92c-1.1.74-2.52 1.18-4.2 1.18-3.08 0-5.71-2.7-6.64-5.46L1.5 16.5C3.39 20.35 7.35 23 12 23z" />
-                  </svg>
-                  Continue with Google
+                  Forgot password?
                 </button>
-              ) : (
-                <div id="google-signin-btn-container" className="w-full flex justify-center py-1"></div>
-              )}
-
-              <div className="text-center text-sm font-medium text-slate-600 mt-6">
-                Don't have an account?{' '}
-                <Link href="/patient/signup" className="text-primary-600 font-bold hover:text-primary-700 underline transition">
-                  Sign up
-                </Link>
               </div>
-            </form>
-          )}
-        </div>
-      </section>
-    </main>
+              <div className="relative">
+                <input
+                  id="password-field"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${authInput} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink cursor-pointer"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading} className={`${authPrimaryButton} !mt-6`}>
+              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              Sign in
+            </button>
+
+            {googleEnabled && (
+              <>
+                <div className="flex items-center gap-4 py-1">
+                  <div className="h-px flex-1 bg-line" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">or</span>
+                  <div className="h-px flex-1 bg-line" />
+                </div>
+                <div id="google-signin-btn-container" className="flex w-full justify-center" />
+              </>
+            )}
+          </form>
+        )}
+
+        {!forgotPasswordMode && (
+          <div className="mt-8 rounded-2xl border border-line bg-white p-4 text-sm text-ink-muted">
+            Are you a physician?{' '}
+            <Link href="/doctor/login" className="font-semibold text-forest hover:underline">
+              Sign in to the clinic portal
+            </Link>
+          </div>
+        )}
+      </div>
+    </AuthShell>
   );
 }
 
 export default function PatientLogin() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-cream text-primary-850 font-semibold">
-        Loading form...
-      </div>
-    }>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-bg text-sm text-ink-muted">Loading…</div>}>
       <PatientLoginContent />
     </Suspense>
   );

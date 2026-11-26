@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ users });
   } catch (error: any) {
     console.error('Admin users get error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -169,6 +170,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Admin user create error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

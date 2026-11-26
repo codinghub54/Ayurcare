@@ -1,25 +1,43 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Fraunces } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
-import SmoothScroll from '@/components/ui/SmoothScroll';
 
 const inter = Inter({
-  variable: '--font-sans',
+  variable: '--font-inter',
   subsets: ['latin'],
   display: 'swap',
 });
 
 const fraunces = Fraunces({
-  variable: '--font-display',
+  variable: '--font-fraunces',
   subsets: ['latin'],
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'VedaSync AI — Ancient Wisdom, Modern Care',
-  description: 'Sync your biological rhythms with 5,000 years of Ayurvedic wisdom and advanced AI diagnostics. Consult verified Ayurvedic physicians, analyze reports, and discover your Prakriti.',
-  keywords: 'ayurveda, vedasync, telehealth, dosha, prakriti, AI health, ayurvedic consultation, wellness, vata, pitta, kapha',
+  title: {
+    default: 'AyurCare — Ayurvedic care, online',
+    template: '%s · AyurCare',
+  },
+  description:
+    'Consult Ayurvedic physicians online, discover your Prakriti (dosha type), keep your health records in one place and get AI-assisted guidance rooted in Ayurveda.',
+  keywords: [
+    'ayurveda',
+    'ayurcare',
+    'ayurvedic doctor online',
+    'telehealth',
+    'dosha',
+    'prakriti',
+    'vata',
+    'pitta',
+    'kapha',
+  ],
+  icons: { icon: '/favicon.ico' },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#1E5A43',
 };
 
 export default function RootLayout({
@@ -29,16 +47,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
-      <head>
-        <link rel="icon" href="/favicon.ico" />
-      </head>
       <body className="min-h-full flex flex-col bg-bg text-ink">
         <AuthProvider>
-          <SmoothScroll>
-            <div className="flex-1 flex flex-col">
-              {children}
-            </div>
-          </SmoothScroll>
+          <div className="flex-1 flex flex-col">{children}</div>
         </AuthProvider>
       </body>
     </html>

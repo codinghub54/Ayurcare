@@ -177,7 +177,7 @@ function AdminDashboardContent() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-5 gap-4">
         <div>
           <h1 className="font-display text-3xl font-extrabold text-white flex items-center gap-3">
-            <span>VedaSync Enterprise Control Center</span>
+            <span>AyurCare Enterprise Control Center</span>
           </h1>
           <p className="text-slate-400 text-sm mt-1">Real-time revenue, security 2FA, platform ops, and business intelligence controls.</p>
         </div>

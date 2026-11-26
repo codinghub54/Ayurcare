@@ -1,0 +1,212 @@
+[
+  {
+    "id": "remedy-ginger-honey",
+    "symptom": "Cold & Sore Throat",
+    "name": "Ginger, Tulsi & Honey Infusion",
+    "desc": "A widely used Indian kitchen remedy. Ginger (Shunthi/Ardraka) and Tulsi are traditionally used to ease throat irritation and congestion, and honey soothes the throat.",
+    "ingredients": ["1 inch fresh ginger, crushed", "5-6 fresh Tulsi (holy basil) leaves", "1 cup water", "1 tsp raw honey"],
+    "preparation": ["Boil the ginger and Tulsi leaves in water for 5-7 minutes.", "Strain into a cup and let it cool until warm (not hot).", "Stir in the honey only after it has cooled to drinking temperature."],
+    "usage": "Sip warm, 2 times a day while symptoms last.",
+    "warning": "Do not give honey to infants under 1 year. Ayurveda advises against heating honey. See a doctor if fever is high or symptoms last beyond 3 days."
+  },
+  {
+    "id": "remedy-turmeric-milk",
+    "symptom": "Cough & Chest Phlegm",
+    "name": "Haldi Doodh (Turmeric Milk)",
+    "desc": "Warm milk with turmeric and a pinch of black pepper is a traditional evening drink for a mild cough. Black pepper is commonly added alongside turmeric.",
+    "ingredients": ["1 cup milk (or plant milk)", "1/2 tsp turmeric powder", "1 pinch black pepper powder", "Jaggery to taste (optional)"],
+    "preparation": ["Warm the milk in a pan.", "Add turmeric and black pepper and simmer for 2-3 minutes, stirring.", "Remove from heat, add jaggery if using, and drink warm."],
+    "usage": "Once a day, preferably before bed.",
+    "warning": "Avoid if you have a dairy allergy (use plant milk instead). People on blood thinners or with gallstones should check with a doctor before regular turmeric use. Seek care for cough with blood, breathlessness, or lasting more than 2 weeks."
+  },
+  {
+    "id": "remedy-saunf-mishri",
+    "symptom": "Acidity & Heartburn",
+    "name": "Saunf & Mishri After Meals",
+    "desc": "Chewing fennel seeds (saunf) with rock sugar (mishri) after meals is a common Indian practice. Fennel is considered cooling in Ayurveda and is used for mild acidity.",
+    "ingredients": ["1 tsp fennel seeds", "1/2 tsp mishri (rock sugar) crystals"],
+    "preparation": ["Mix fennel seeds and mishri.", "Chew slowly after a meal."],
+    "usage": "After lunch and dinner.",
+    "warning": "People with diabetes should skip the mishri. Frequent or severe heartburn, difficulty swallowing, or chest pain needs a doctor's evaluation."
+  },
+  {
+    "id": "remedy-coriander-water",
+    "symptom": "Acidity & Heartburn",
+    "name": "Cool Coriander Seed Water",
+    "desc": "Coriander (Dhanyaka) is considered cooling and Pitta-pacifying in Ayurveda. Soaked coriander water is a traditional drink for a burning sensation from acidity.",
+    "ingredients": ["1 tsp coriander seeds, lightly crushed", "1 glass water"],
+    "preparation": ["Soak the crushed coriander seeds in water overnight.", "Strain in the morning."],
+    "usage": "Drink on an empty stomach in the morning.",
+    "warning": "For mild symptoms only. Chest pain that spreads to the arm, jaw or back is an emergency, not acidity."
+  },
+  {
+    "id": "remedy-ajwain-water",
+    "symptom": "Bloating & Gas",
+    "name": "Ajwain & Black Salt Water",
+    "desc": "Ajwain (carom seeds) is one of the most commonly used Indian kitchen remedies for gas and bloating after a heavy meal.",
+    "ingredients": ["1/2 tsp ajwain (carom seeds)", "1 pinch kala namak (black salt)", "1 cup warm water"],
+    "preparation": ["Lightly dry-roast the ajwain for a few seconds.", "Add to warm water with the black salt, or chew the seeds and drink the warm water after."],
+    "usage": "Once after a heavy meal, up to twice a day.",
+    "warning": "Avoid large amounts during pregnancy. People on a low-salt diet for blood pressure should skip the black salt. Severe abdominal pain needs medical attention."
+  },
+  {
+    "id": "remedy-hing",
+    "symptom": "Bloating & Gas",
+    "name": "Hing (Asafoetida) in Warm Water",
+    "desc": "A pinch of hing is used in Indian cooking to make lentils and beans easier to digest, and is also taken in warm water for gas.",
+    "ingredients": ["1 small pinch hing (asafoetida)", "1/2 cup warm water"],
+    "preparation": ["Dissolve the hing in warm water and stir well."],
+    "usage": "Once, after meals, when needed.",
+    "warning": "Use only a pinch. Avoid during pregnancy and in young children unless advised by a doctor. Many commercial hing powders contain wheat flour, so check the label if you are gluten-intolerant."
+  },
+  {
+    "id": "remedy-jeera-water",
+    "symptom": "Indigestion & Heaviness",
+    "name": "Jeera (Cumin) Water",
+    "desc": "Cumin is traditionally used in Ayurveda to support Agni (digestive fire). Jeera water is a simple everyday drink for a heavy stomach.",
+    "ingredients": ["1 tsp cumin seeds", "1.5 cups water"],
+    "preparation": ["Boil cumin seeds in water for 5 minutes until the water turns light golden.", "Strain and let it cool until warm."],
+    "usage": "Sip warm after meals.",
+    "warning": "For occasional indigestion only. Ongoing indigestion with weight loss, vomiting or black stools needs a doctor."
+  },
+  {
+    "id": "remedy-buttermilk",
+    "symptom": "Indigestion & Heaviness",
+    "name": "Spiced Takra (Buttermilk)",
+    "desc": "Takra (thin buttermilk) is praised in classical Ayurvedic texts as an aid to digestion. It is traditionally taken with lunch, spiced with roasted cumin.",
+    "ingredients": ["1/4 cup fresh curd (yogurt)", "3/4 cup water", "1/4 tsp roasted cumin powder", "Pinch of rock salt", "Few fresh coriander or mint leaves"],
+    "preparation": ["Whisk curd and water together until smooth.", "Add the roasted cumin, salt and chopped leaves."],
+    "usage": "One glass with or after lunch. Traditionally avoided at night.",
+    "warning": "Avoid if you have a dairy allergy. Use fresh curd, not sour or stale."
+  },
+  {
+    "id": "remedy-triphala",
+    "symptom": "Constipation",
+    "name": "Triphala Churna at Bedtime",
+    "desc": "Triphala is a classical Ayurvedic blend of Amalaki, Bibhitaki and Haritaki, commonly used at bedtime as a gentle bowel regulator.",
+    "ingredients": ["1/2 to 1 tsp Triphala churna (powder)", "1 cup warm water"],
+    "preparation": ["Mix the Triphala powder into warm water."],
+    "usage": "Drink at bedtime. Start with the smaller dose.",
+    "warning": "Not for pregnant or breastfeeding women, or children, without a doctor's advice. Stop if it causes diarrhoea or cramping. Constipation with blood or sudden change in bowel habits needs a doctor."
+  },
+  {
+    "id": "remedy-ghee-milk",
+    "symptom": "Constipation",
+    "name": "Warm Milk with Ghee",
+    "desc": "A teaspoon of ghee in warm milk at night is a traditional remedy for dry, hard stools, which Ayurveda links to aggravated Vata.",
+    "ingredients": ["1 cup milk", "1 tsp ghee"],
+    "preparation": ["Warm the milk and stir in the ghee."],
+    "usage": "Drink at bedtime.",
+    "warning": "Avoid with dairy allergy. People with high cholesterol or heart disease should ask their doctor before adding ghee regularly."
+  },
+  {
+    "id": "remedy-nutmeg-milk",
+    "symptom": "Insomnia & Restlessness",
+    "name": "Warm Milk with a Pinch of Nutmeg",
+    "desc": "Warm milk with a very small pinch of nutmeg (Jatiphala) is a traditional bedtime drink in Ayurveda for restlessness.",
+    "ingredients": ["1 cup milk", "1 small pinch freshly grated nutmeg", "1 pinch cardamom powder (optional)"],
+    "preparation": ["Warm the milk.", "Add nutmeg and cardamom and stir well."],
+    "usage": "30 minutes before bed.",
+    "warning": "Use only a tiny pinch. Nutmeg in larger amounts is toxic. Not for children or during pregnancy. Long-standing insomnia should be discussed with a doctor."
+  },
+  {
+    "id": "remedy-ginger-lemon",
+    "symptom": "Nausea & Motion Sickness",
+    "name": "Fresh Ginger with Lemon",
+    "desc": "Ginger is one of the best-known kitchen remedies for nausea, and is often chewed before travel.",
+    "ingredients": ["A thin slice of fresh ginger", "A few drops of lemon juice", "A pinch of rock salt"],
+    "preparation": ["Sprinkle lemon juice and rock salt on the ginger slice."],
+    "usage": "Chew slowly when nausea starts, or before a journey.",
+    "warning": "Persistent vomiting, vomiting in pregnancy, or signs of dehydration need medical attention."
+  },
+  {
+    "id": "remedy-sesame-oil",
+    "symptom": "Joint Stiffness & Pain",
+    "name": "Warm Sesame Oil Massage (Abhyanga)",
+    "desc": "Massage with warm sesame oil is a core Ayurvedic self-care practice, traditionally used for stiffness linked to Vata.",
+    "ingredients": ["2-3 tbsp sesame oil (til ka tel)"],
+    "preparation": ["Warm the oil gently in a bowl placed in hot water.", "Massage into the stiff joint in circular strokes for 10-15 minutes."],
+    "usage": "Once a day, followed by a warm bath.",
+    "warning": "Do not massage a joint that is red, hot or swollen, or after an injury. Test on a small patch first. Sudden severe joint pain needs a doctor."
+  },
+  {
+    "id": "remedy-ajwain-jaggery",
+    "symptom": "Menstrual Cramps",
+    "name": "Ajwain & Jaggery Tea",
+    "desc": "A warm tea of ajwain with jaggery is a common household remedy for mild period cramps in many Indian homes.",
+    "ingredients": ["1/2 tsp ajwain (carom seeds)", "1 small piece jaggery", "1.5 cups water"],
+    "preparation": ["Boil ajwain in water for 5 minutes.", "Add jaggery, stir until dissolved, and strain."],
+    "usage": "Sip warm, 1-2 times a day during cramps. A warm compress on the lower abdomen also helps.",
+    "warning": "Very heavy bleeding, severe pain, or pain that is new for you should be checked by a gynaecologist."
+  },
+  {
+    "id": "remedy-clove",
+    "symptom": "Toothache & Gum Swelling",
+    "name": "Clove for Temporary Tooth Pain",
+    "desc": "Clove (Lavanga) contains eugenol and has long been used in India and elsewhere for temporary toothache relief.",
+    "ingredients": ["1 whole clove, or 1 drop clove oil diluted in 1/2 tsp coconut oil", "Warm salt water for rinsing"],
+    "preparation": ["Rinse the mouth with warm salt water.", "Hold the clove against the painful tooth, or dab the diluted oil with a cotton swab."],
+    "usage": "Up to 3 times a day until you can see a dentist.",
+    "warning": "Temporary relief only. Never apply undiluted clove oil to gums. A toothache with facial swelling or fever needs a dentist urgently."
+  },
+  {
+    "id": "remedy-coconut-oil-skin",
+    "symptom": "Skin Irritation & Itching",
+    "name": "Coconut Oil for Dry, Itchy Skin",
+    "desc": "Coconut oil is considered cooling in Ayurveda and is a traditional moisturiser for dry or mildly itchy skin.",
+    "ingredients": ["Virgin coconut oil"],
+    "preparation": ["Apply a thin layer to clean, slightly damp skin."],
+    "usage": "1-2 times a day, especially after a bath.",
+    "warning": "Patch-test first. Do not use on broken skin, oozing rashes or infections. Hives with swelling of the lips or breathing trouble is an emergency."
+  },
+  {
+    "id": "remedy-tulsi-fever",
+    "symptom": "Mild Fever & Body Ache",
+    "name": "Tulsi, Black Pepper & Ginger Kadha",
+    "desc": "A kadha (decoction) of Tulsi, black pepper and ginger is one of the most common Indian home remedies taken during a mild cold with body ache.",
+    "ingredients": ["8-10 Tulsi leaves", "3-4 black peppercorns, crushed", "1/2 inch ginger, crushed", "2 cups water", "Jaggery to taste (optional)"],
+    "preparation": ["Boil everything in water until it reduces to about 1 cup.", "Strain and drink warm."],
+    "usage": "Twice a day while symptoms last. Rest and drink plenty of fluids.",
+    "warning": "Not a substitute for fever medicine or testing. See a doctor for fever above 102°F (38.9°C), fever lasting more than 3 days, rash, confusion, or any fever in an infant."
+  },
+  {
+    "id": "remedy-amla",
+    "symptom": "Fatigue & Low Energy",
+    "name": "Amla (Indian Gooseberry)",
+    "desc": "Amla is one of the richest natural sources of vitamin C and is classed as a Rasayana (rejuvenative) in Ayurveda.",
+    "ingredients": ["1 fresh amla, or 1 tsp amla powder", "1/2 glass warm water", "1/2 tsp honey (optional)"],
+    "preparation": ["Eat the fresh amla with a pinch of salt, or mix amla powder in warm water with honey once it has cooled."],
+    "usage": "Once daily in the morning.",
+    "warning": "Ongoing tiredness can have medical causes such as anaemia or thyroid problems, so get a check-up if it lasts more than 2 weeks. People on diabetes or blood-thinning medicine should ask their doctor before regular use."
+  },
+  {
+    "id": "remedy-cool-compress",
+    "symptom": "Eye Fatigue & Strain",
+    "name": "Cool Cucumber or Cold Compress",
+    "desc": "Cool compresses over closed eyes are a simple, traditional way to relax tired eyes after long screen time.",
+    "ingredients": ["2 slices chilled cucumber, or a clean cloth dipped in cool water"],
+    "preparation": ["Lie back and place the cucumber slices or cool cloth over closed eyelids."],
+    "usage": "10 minutes, as needed. Also follow the 20-20-20 rule: every 20 minutes, look 20 feet away for 20 seconds.",
+    "warning": "Do not put anything inside the eye. Eye pain, redness, discharge or changes in vision need an eye doctor."
+  },
+  {
+    "id": "remedy-coconut-hair",
+    "symptom": "Hair Fall & Dry Scalp",
+    "name": "Warm Coconut Oil Scalp Massage",
+    "desc": "Oiling the scalp with coconut oil is a long-standing Indian hair-care practice for a dry scalp.",
+    "ingredients": ["2 tbsp coconut oil", "A few curry leaves (optional)"],
+    "preparation": ["Warm the oil gently; you can heat the curry leaves in it until they crackle, then cool and strain.", "Massage into the scalp with fingertips for 5-10 minutes."],
+    "usage": "Leave on for an hour or overnight, then wash. 1-2 times a week.",
+    "warning": "Sudden or patchy hair loss can signal thyroid, iron or other health issues, so see a doctor or dermatologist."
+  },
+  {
+    "id": "remedy-head-massage",
+    "symptom": "Headache & Stress",
+    "name": "Temple Massage & Rest",
+    "desc": "Gentle massage of the temples and forehead with a little oil, followed by rest in a quiet room, is a traditional way to ease a tension headache.",
+    "ingredients": ["A few drops of coconut or sesame oil", "A glass of water"],
+    "preparation": ["Drink a glass of water first, since dehydration is a common trigger.", "Massage the temples and forehead in slow circles for 5 minutes, then rest with eyes closed."],
+    "usage": "As needed.",
+    "warning": "A sudden, severe 'worst-ever' headache, headache with fever and stiff neck, or with weakness or confusion, is an emergency."
+  }
+]

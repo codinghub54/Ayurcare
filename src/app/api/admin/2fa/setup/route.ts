@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -59,6 +60,6 @@ export async function POST() {
     });
   } catch (error: any) {
     console.error('2FA setup error:', error);
-    return NextResponse.json({ error: error.message || '2FA setup failed' }, { status: 500 });
+    return apiError(error, '2FA setup failed');
   }
 }

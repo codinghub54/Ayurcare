@@ -166,7 +166,7 @@ export default function FindAndBookDoctor() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Dr. Sharma, Panchakarma..."
+              placeholder="Search by name or specialisation…"
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm focus:ring-2 focus:ring-primary-600 focus:outline-none"
             />
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -217,7 +217,7 @@ export default function FindAndBookDoctor() {
                   
                   <div className="flex items-center space-x-1 text-gold-600 mt-1">
                     <Star className="w-4 h-4 fill-gold-600" />
-                    <span className="text-xs font-bold text-slate-700">{profile.avgRating || '4.8'}</span>
+                    <span className="text-xs font-bold text-slate-700">{profile.avgRating > 0 ? Number(profile.avgRating).toFixed(1) : 'New — no ratings yet'}</span>
                   </div>
 
                   <div className="mt-4 space-y-1.5 text-xs text-slate-600">

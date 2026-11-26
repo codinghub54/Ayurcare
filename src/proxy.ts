@@ -13,7 +13,7 @@ function decodeJwt(token: string): any {
   }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Get tokens from cookies

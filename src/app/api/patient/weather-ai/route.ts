@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -91,6 +92,6 @@ Do not include markdown or other text besides the raw JSON object.`;
 
   } catch (error: any) {
     console.error('Weather AI recommendation error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to get recommendation' }, { status: 500 });
+    return apiError(error, 'Failed to get recommendation');
   }
 }

@@ -250,7 +250,7 @@ export default function PatientDashboard() {
           // 1. Reverse Geocode City via Nominatim (OSM)
           const geoRes = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'User-Agent': 'VedaSync-AI-App' } }
+            { headers: { 'User-Agent': 'AyurCare-AI-App' } }
           );
           
           let detectedCity = 'My Location';
@@ -261,7 +261,7 @@ export default function PatientDashboard() {
           
           setCity(detectedCity);
           setCitySearchInput(detectedCity);
-          localStorage.setItem('vedasync_city', detectedCity);
+          localStorage.setItem('ayurcare_city', detectedCity);
           
           // 2. Fetch current weather from Open-Meteo
           const weatherRes = await fetch(
@@ -375,7 +375,7 @@ export default function PatientDashboard() {
     fetchData();
     
     // Check local storage for city
-    const storedCity = localStorage.getItem('vedasync_city') || 'New Delhi';
+    const storedCity = localStorage.getItem('ayurcare_city') || 'New Delhi';
     setCity(storedCity);
     setCitySearchInput(storedCity);
 
@@ -383,21 +383,21 @@ export default function PatientDashboard() {
     detectLocationAndWeather();
 
     // Load completed tasks
-    const storedTasksKey = `vedasync_tasks_${todayStr}`;
+    const storedTasksKey = `ayurcare_tasks_${todayStr}`;
     const storedTasks = localStorage.getItem(storedTasksKey);
     if (storedTasks) {
       setCompletedTasks(JSON.parse(storedTasks));
     }
 
     // Streak Check on Load
-    const streakCountVal = parseInt(localStorage.getItem('vedasync_streak_count') || '0', 10);
-    const lastDate = localStorage.getItem('vedasync_streak_last_date') || '';
+    const streakCountVal = parseInt(localStorage.getItem('ayurcare_streak_count') || '0', 10);
+    const lastDate = localStorage.getItem('ayurcare_streak_last_date') || '';
     const yesterdayStr = getYesterdayStr();
 
     if (lastDate && lastDate !== todayStr && lastDate !== yesterdayStr) {
       // Streak broken!
       setStreakCount(0);
-      localStorage.setItem('vedasync_streak_count', '0');
+      localStorage.setItem('ayurcare_streak_count', '0');
     } else {
       setStreakCount(streakCountVal);
     }
@@ -411,7 +411,7 @@ export default function PatientDashboard() {
     e.preventDefault();
     if (!citySearchInput.trim()) return;
     setCity(citySearchInput);
-    localStorage.setItem('vedasync_city', citySearchInput);
+    localStorage.setItem('ayurcare_city', citySearchInput);
     fetchWeatherAndAiAdvice(citySearchInput);
   };
 
@@ -434,12 +434,12 @@ export default function PatientDashboard() {
     }
     
     setCompletedTasks(newCompleted);
-    localStorage.setItem(`vedasync_tasks_${todayStr}`, JSON.stringify(newCompleted));
+    localStorage.setItem(`ayurcare_tasks_${todayStr}`, JSON.stringify(newCompleted));
 
     // Handle Streak Progress: if they complete all 10 tasks, increase streak!
     const allCompletedNow = DINACHARYA_TASKS.every(task => newCompleted.includes(task.id));
     if (allCompletedNow) {
-      const lastDate = localStorage.getItem('vedasync_streak_last_date') || '';
+      const lastDate = localStorage.getItem('ayurcare_streak_last_date') || '';
       const yesterdayStr = getYesterdayStr();
 
       if (lastDate !== todayStr) {
@@ -448,8 +448,8 @@ export default function PatientDashboard() {
           newStreak = streakCount + 1;
         }
         setStreakCount(newStreak);
-        localStorage.setItem('vedasync_streak_count', newStreak.toString());
-        localStorage.setItem('vedasync_streak_last_date', todayStr);
+        localStorage.setItem('ayurcare_streak_count', newStreak.toString());
+        localStorage.setItem('ayurcare_streak_last_date', todayStr);
       }
     }
   };
@@ -506,7 +506,7 @@ export default function PatientDashboard() {
   const completionPercentage = Math.round((completedTasks.length / DINACHARYA_TASKS.length) * 100);
 
   return (
-    <div className="space-y-8 animate-fadeIn font-sans text-slate-800" id="vedasync-patient-dashboard">
+    <div className="space-y-8 animate-fadeIn font-sans text-slate-800" id="ayurcare-patient-dashboard">
       {/* Header banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -990,7 +990,7 @@ export default function PatientDashboard() {
               )}
             </div>
 
-            {/* VedaSync Daily Secret (Did You Know?) Widget */}
+            {/* AyurCare Daily Secret (Did You Know?) Widget */}
             <div className="bg-gradient-to-br from-gold-50/60 to-gold-100/40 border border-gold-200/50 rounded-3xl p-6 shadow-md relative overflow-hidden glow-gold">
               <div className="absolute -top-10 -right-10 w-24 h-24 bg-gold-300/20 rounded-full filter blur-xl"></div>
               

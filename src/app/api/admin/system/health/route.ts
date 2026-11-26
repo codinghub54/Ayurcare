@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -103,6 +104,6 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error('System health check error:', error);
-    return NextResponse.json({ error: error.message || 'Health check failed' }, { status: 500 });
+    return apiError(error, 'Health check failed');
   }
 }

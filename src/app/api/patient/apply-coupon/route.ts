@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -121,9 +122,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Apply coupon error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to apply coupon' },
-      { status: 500 }
-    );
+    return apiError(error, 'Failed to apply coupon');
   }
 }

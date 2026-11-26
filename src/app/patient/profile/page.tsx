@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Camera, Check, UploadCloud, User, Activity, Clock, ShieldAlert, CheckSquare, Heart } from 'lucide-react';
+import { Loader2, Camera, Check, UploadCloud, User, Activity, Clock, ShieldAlert, CheckSquare, Heart, Download } from 'lucide-react';
 
 interface EmergencyContact {
   name: string;
@@ -230,21 +230,59 @@ export default function PatientProfileDashboard() {
     }
   };
 
-  // Mocked Prakriti quiz breakdown (default fallback)
-  const userDosha = user?.patientProfile?.doshaType || 'Vata-Pitta';
+  const [exporting, setExporting] = useState(false);
+  const handleExportData = async () => {
+    setExporting(true);
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/patient/data-export');
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ayurcare-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErrorMsg('Could not prepare your data export. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Prakriti breakdown from the patient's saved quiz scores (no fallback values)
+  const rawDosha: string | undefined = user?.patientProfile?.doshaType || undefined;
+  const userDosha = rawDosha
+    ? rawDosha
+        .split('_')
+        .map((d) => d.charAt(0) + d.slice(1).toLowerCase())
+        .join('-')
+    : null;
+  const quizScores: { vata: number; pitta: number; kapha: number } | null = (() => {
+    try {
+      const parsed = JSON.parse(user?.patientProfile?.lifestyleData || '{}');
+      const sc = parsed?.scores;
+      if (sc && typeof sc.vata === 'number' && typeof sc.pitta === 'number' && typeof sc.kapha === 'number') return sc;
+    } catch {}
+    return null;
+  })();
+  const scoreTotal = quizScores ? quizScores.vata + quizScores.pitta + quizScores.kapha : 0;
+  const pct = (n: number) => (scoreTotal > 0 ? Math.round((n / scoreTotal) * 100) : 0);
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto" id="patient-profile-dashboard">
       {/* Messages */}
       {successMsg && (
-        <div className="bg-emerald-950/60 border border-emerald-900 text-emerald-300 p-4 rounded-xl text-sm font-semibold flex items-center space-x-3 animate-fadeIn">
-          <Check className="w-5 h-5 text-emerald-400" />
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-sm font-semibold flex items-center space-x-3 animate-fadeIn">
+          <Check className="w-5 h-5 text-emerald-600" />
           <span>{successMsg}</span>
         </div>
       )}
       {errorMsg && (
-        <div className="bg-red-950/60 border border-red-900 text-red-300 p-4 rounded-xl text-sm font-semibold flex items-center space-x-3 animate-fadeIn">
-          <ShieldAlert className="w-5 h-5 text-red-400" />
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-semibold flex items-center space-x-3 animate-fadeIn">
+          <ShieldAlert className="w-5 h-5 text-red-500" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -506,44 +544,73 @@ export default function PatientProfileDashboard() {
               Prakriti Constitution Breakdown
             </h3>
 
-            <div className="flex items-center space-x-6">
-              {/* Radial Pie-Circle Chart (simulated with layered gradients) */}
-              <div className="relative w-28 h-28 rounded-full border-4 border-slate-100 flex items-center justify-center bg-gradient-to-tr from-indigo-500 via-amber-500 to-emerald-500 shadow-md">
-                <div className="absolute inset-2 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
-                  <span className="text-[10px] text-slate-400 font-extrabold uppercase">Quiz Dominance</span>
-                  <span className="text-base font-extrabold text-slate-800 leading-none">{userDosha}</span>
+            {userDosha && quizScores ? (
+              <>
+                <div className="flex items-center space-x-6">
+                  <div
+                    className="relative w-28 h-28 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      background: `conic-gradient(#5F86A0 0 ${pct(quizScores.vata)}%, #C4622D ${pct(quizScores.vata)}% ${pct(quizScores.vata) + pct(quizScores.pitta)}%, #4F7D52 ${pct(quizScores.vata) + pct(quizScores.pitta)}% 100%)`,
+                    }}
+                  >
+                    <div className="absolute inset-2.5 bg-white rounded-full flex flex-col items-center justify-center">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dominant</span>
+                      <span className="text-sm font-extrabold text-slate-800 leading-tight text-center px-1">{userDosha}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5 text-xs font-semibold text-slate-600 flex-1">
+                    {[
+                      { label: 'Vata', value: quizScores.vata, color: '#5F86A0' },
+                      { label: 'Pitta', value: quizScores.pitta, color: '#C4622D' },
+                      { label: 'Kapha', value: quizScores.kapha, color: '#4F7D52' },
+                    ].map((d) => (
+                      <div key={d.label} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-3 h-3 rounded block" style={{ background: d.color }}></span>
+                          <span>{d.label}</span>
+                        </div>
+                        <span className="font-bold text-slate-800">{pct(d.value)}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed mt-4">
+                  Based on your answers to the Prakriti quiz. Retake it any time if you feel your answers have changed.
+                </p>
+              </>
+            ) : userDosha ? (
+              <p className="text-sm text-slate-600">
+                Your recorded Prakriti is <strong className="text-slate-800">{userDosha}</strong>. Retake the quiz to see the full breakdown.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600">You haven&apos;t taken the Prakriti quiz yet.</p>
+            )}
+            <a
+              href="/patient/quiz"
+              className="mt-4 inline-flex items-center text-xs font-bold text-primary-700 hover:text-primary-900"
+            >
+              {userDosha ? 'Retake the Prakriti quiz' : 'Take the Prakriti quiz'} →
+            </a>
+          </div>
 
-              {/* Legend with matching colors */}
-              <div className="space-y-2 text-xs font-semibold text-slate-600 flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-3 h-3 rounded bg-indigo-500 block"></span>
-                    <span>Vata Energy</span>
-                  </div>
-                  <span className="font-bold text-slate-800">35%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-3 h-3 rounded bg-amber-500 block"></span>
-                    <span>Pitta Energy</span>
-                  </div>
-                  <span className="font-bold text-slate-800">45%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-3 h-3 rounded bg-emerald-500 block"></span>
-                    <span>Kapha Energy</span>
-                  </div>
-                  <span className="font-bold text-slate-800">20%</span>
-                </div>
-              </div>
-            </div>
-            
-            <p className="text-[11px] text-slate-450 text-slate-400 leading-relaxed mt-4 italic">
-              *Breakdown derived from your quiz responses. Take the quiz again under dashboards if you feel your symptoms or energies have shifted.
+          {/* Data export */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-slate-800 font-bold text-sm flex items-center">
+              <Download className="w-4 h-4 mr-2 text-primary-600" />
+              Your data
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed mt-2">
+              Download a copy of your profile, appointments, prescriptions and lab reports stored in AyurCare.
             </p>
+            <button
+              type="button"
+              onClick={handleExportData}
+              disabled={exporting}
+              className="mt-4 w-full py-2.5 border border-slate-200 hover:border-primary-600 hover:text-primary-700 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center disabled:opacity-50 cursor-pointer"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              Download my data (JSON)
+            </button>
           </div>
 
           {/* 2. Dinacharya Live Biological Clock */}

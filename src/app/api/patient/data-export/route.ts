@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -60,11 +61,11 @@ export async function GET() {
 
     return NextResponse.json({
       exportTimestamp: new Date().toISOString(),
-      platform: 'VedaSync.ai / AyurCare',
+      platform: 'AyurCare',
       data: userData,
     });
   } catch (error: any) {
     console.error('Data export error:', error);
-    return NextResponse.json({ error: error.message || 'Data export failed' }, { status: 500 });
+    return apiError(error, 'Data export failed');
   }
 }

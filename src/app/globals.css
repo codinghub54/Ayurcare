@@ -1,83 +1,118 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   AyurCare design system
+   Warm ivory surfaces, deep forest green brand colour, saffron accent.
+   The `primary-*` and `gold-*` scales are mapped to the brand so every
+   portal screen picks up the same palette.
+   ========================================================================== */
+
 @theme {
-  /* Brand palette */
-  --color-bg: #0F1210;
-  --color-bg-card: #171B17;
-  --color-ink: #F5F1E8;
-  --color-ink-muted: #A8A296;
-  --color-turmeric: #C9A24B;
-  --color-tulsi: #3E5C4A;
+  /* Core brand tokens */
+  --color-bg: #FBF8F2;
+  --color-bg-card: #FFFFFF;
+  --color-ink: #16261E;
+  --color-ink-muted: #5B6A61;
+  --color-line: #E8E1D3;
+  --color-forest: #1E5A43;
+  --color-forest-deep: #123A2B;
+  --color-sage: #E6EFE8;
+  --color-saffron: #D4862A;
+  --color-saffron-soft: #FBEEDB;
+
+  /* Legacy tokens kept so older screens still resolve */
+  --color-turmeric: #D4862A;
+  --color-tulsi: #1E5A43;
   --color-clay: #B5654A;
-  --color-vata: #8FA9B8;
-  --color-pitta: #C9683B;
-  --color-kapha: #6E8F6B;
-  --color-parchment: #FAF7F0;
-  --color-ink-light: #14170F;
+  --color-vata: #5F86A0;
+  --color-pitta: #C4622D;
+  --color-kapha: #4F7D52;
+  --color-parchment: #FBF8F2;
+  --color-ink-light: #16261E;
+  --color-cream: #FBF8F2;
+  --color-cream-dark: #F3EDE1;
 
-  /* Cream backgrounds */
-  --color-cream: #FAF7F0;
-  --color-cream-dark: #F2EDE4;
+  /* Brand green scale (forest) */
+  --color-primary-50: #F0F6F2;
+  --color-primary-100: #DCEBE1;
+  --color-primary-200: #BAD6C4;
+  --color-primary-300: #8DBA9F;
+  --color-primary-400: #5E9879;
+  --color-primary-500: #3B7A5C;
+  --color-primary-550: #33704F;
+  --color-primary-600: #2A6A4F;
+  --color-primary-605: #286649;
+  --color-primary-650: #245E46;
+  --color-primary-655: #225A43;
+  --color-primary-700: #1E5A43;
+  --color-primary-750: #1A4F3B;
+  --color-primary-800: #174634;
+  --color-primary-850: #133B2C;
+  --color-primary-855: #12382A;
+  --color-primary-900: #102F24;
+  --color-primary-950: #0A1F17;
 
-  /* Primary green color scale (for buttons, cards, links across portal) */
-  --color-primary-50: #f0fdf4;
-  --color-primary-100: #dcfce7;
-  --color-primary-200: #bbf7d0;
-  --color-primary-300: #86efac;
-  --color-primary-400: #4ade80;
-  --color-primary-500: #22c55e;
-  --color-primary-600: #16a34a;
-  --color-primary-700: #15803d;
-  --color-primary-750: #114223;
-  --color-primary-800: #166534;
-  --color-primary-850: #0f291e;
-  --color-primary-900: #14532d;
-  --color-primary-950: #052e16;
+  /* Saffron accent scale */
+  --color-gold-50: #FDF7EE;
+  --color-gold-100: #FBEEDB;
+  --color-gold-200: #F5D8AE;
+  --color-gold-300: #EDBD7B;
+  --color-gold-400: #E3A14E;
+  --color-gold-500: #D98E35;
+  --color-gold-600: #D4862A;
+  --color-gold-700: #A9651C;
+  --color-gold-800: #844E18;
+  --color-gold-900: #633B14;
+  --color-gold-950: #3A220A;
 
-  /* Gold color scale */
-  --color-gold-50: #fffbeb;
-  --color-gold-100: #fef3c7;
-  --color-gold-200: #fde68a;
-  --color-gold-300: #fcd34d;
-  --color-gold-400: #fbbf24;
-  --color-gold-500: #f59e0b;
-  --color-gold-600: #d97706;
-  --color-gold-700: #b45309;
-  --color-gold-800: #92400e;
-  --color-gold-900: #78350f;
-  --color-gold-950: #451a03;
-
-  /* Non-standard slate/rose steps used in portal views */
-  --color-slate-150: #f1f5f9;
-  --color-slate-350: #cbd5e1;
-  --color-slate-805: #1e293b;
-  --color-slate-850: #0f172a;
+  /* Non-standard slate/rose/amber steps used in portal views */
+  --color-slate-150: #EEF1F4;
+  --color-slate-350: #C5CED9;
+  --color-slate-805: #1E293B;
+  --color-slate-850: #0F172A;
   --color-rose-750: #881337;
+  --color-amber-250: #FCD98A;
 
-  /* CSS variables mapping */
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
 
-  /* Fonts */
-  --font-display: 'Fraunces', serif;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  /* Fonts (variables are injected by next/font in layout.tsx) */
+  --font-display: var(--font-fraunces), 'Georgia', serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --animate-fadeIn: fade-in 0.35s ease-out both;
+  --animate-slideUp: slide-up 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 :root {
-  --background: #0F1210;
-  --foreground: #F5F1E8;
-  --card: #171B17;
-  --card-foreground: #F5F1E8;
-  --primary: #C9A24B;
-  --primary-foreground: #0F1210;
-  --border: #2A2E2A;
+  --background: #FBF8F2;
+  --foreground: #16261E;
+  --card: #FFFFFF;
+  --card-foreground: #16261E;
+  --primary: #1E5A43;
+  --primary-foreground: #FFFFFF;
+  --border: #E8E1D3;
 }
 
 html {
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 body {
@@ -89,46 +124,73 @@ body {
   overflow-x: hidden;
 }
 
-/* Film-grain noise overlay */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px 256px;
-}
-
-/* Custom scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(201, 162, 75, 0.25);
+  background: rgba(30, 90, 67, 0.18);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(201, 162, 75, 0.5);
+  background: rgba(30, 90, 67, 0.35);
+  background-clip: padding-box;
 }
 
-/* Eyebrow label utility */
+::selection {
+  background: rgba(212, 134, 42, 0.25);
+  color: #16261E;
+}
+
+*:focus-visible {
+  outline: 2px solid #D4862A;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Small uppercase label above headings */
 .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-sans);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.15em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #A8A296;
+  color: var(--color-forest);
 }
 
-/* Marquee animation */
+/* Subtle leaf-vein background pattern for brand panels */
+.bg-leaf-pattern {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.07) 0, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(212, 134, 42, 0.16) 0, transparent 45%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath d='M40 6c10 12 10 56 0 68M40 22c6-4 14-5 20-3M40 38c7-4 16-5 22-2M40 54c6-3 13-4 18-2M40 22c-6-4-14-5-20-3M40 38c-7-4-16-5-22-2M40 54c-6-3-13-4-18-2' fill='none' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='1.2'/%3E%3C/svg%3E");
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(rgba(30, 90, 67, 0.12) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -139,6 +201,11 @@ body::after {
   100% { transform: translateX(0); }
 }
 
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
 .animate-marquee {
   animation: marquee var(--marquee-duration, 30s) linear infinite;
 }
@@ -147,36 +214,6 @@ body::after {
   animation: marquee-reverse var(--marquee-duration, 30s) linear infinite;
 }
 
-/* Magnetic button ripple */
-@keyframes ripple-out {
-  0% {
-    transform: scale(0);
-    opacity: 0.4;
-  }
-  100% {
-    transform: scale(2.5);
-    opacity: 0;
-  }
-}
-
-/* Selection color */
-::selection {
-  background: rgba(201, 162, 75, 0.3);
-  color: #F5F1E8;
-}
-
-/* Smooth reveal mask */
-@keyframes reveal-up {
-  from {
-    clip-path: inset(100% 0 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
-/* Focus styles */
-*:focus-visible {
-  outline: 2px solid rgba(201, 162, 75, 0.5);
-  outline-offset: 2px;
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
 }

@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { sendWelcomeEmail } from '@/lib/email';
@@ -72,6 +73,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('OTP Verification error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred during verification' }, { status: 500 });
+    return apiError(error, 'An error occurred during verification');
   }
 }

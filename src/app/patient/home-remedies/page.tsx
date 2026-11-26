@@ -60,25 +60,25 @@ export default function HomeRemedies() {
     <div className="space-y-8 max-w-6xl mx-auto font-sans text-slate-800" id="home-remedies-page">
       
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-primary-850 via-primary-800 to-primary-650 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-primary-850 via-primary-800 to-primary-650 bg-leaf-pattern rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary-550 rounded-full opacity-35 filter blur-2xl"></div>
         <div className="flex items-center space-x-4 relative z-10">
           <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/20">
             <Home className="w-7 h-7 text-gold-200" />
           </div>
           <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-wide">5,100+ Kitchen Home Remedies (Ghar ke Nuskhe)</h1>
-            <p className="text-primary-100 text-sm mt-1">Simple, safe, and effective kitchen recipes for mild everyday symptoms across 5,100+ verified Nuskhe.</p>
+            <h1 className="font-display text-3xl font-extrabold tracking-wide">Kitchen Home Remedies (Ghar ke Nuskhe)</h1>
+            <p className="text-primary-100 text-sm mt-1">Traditional kitchen remedies for mild, everyday symptoms, each with clear preparation steps and safety warnings.</p>
           </div>
         </div>
       </div>
 
       {/* Safety Notice */}
-      <div className="bg-amber-950/60 border border-amber-900 text-amber-300 p-4 rounded-xl text-xs flex items-start space-x-3">
-        <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+      <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-xs flex items-start space-x-3">
+        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
         <div>
-          <strong className="block text-amber-250 font-bold mb-0.5">Vetting Disclaimer:</strong>
-          These home remedies are for educational purposes and mild symptoms only. If you suffer from high fever, severe acute pain, or chronic conditions, please immediately book a consultation with our certified doctors.
+          <strong className="block font-bold mb-0.5">For mild symptoms only</strong>
+          These remedies are traditional home practices shared for education. They are not a substitute for medical care. For high fever, severe pain, symptoms that persist or worsen, or any chronic condition, please book a consultation with a physician.
         </div>
       </div>
 
@@ -88,7 +88,7 @@ export default function HomeRemedies() {
           <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
           <input
             type="text"
-            placeholder="Search across 5,100+ remedies by symptom or ingredient (e.g. cold, acidity, ginger, bloating)..."
+            placeholder="Search by symptom or ingredient (e.g. cold, acidity, ginger, bloating)..."
             value={searchQuery}
             onChange={handleSearchChange}
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
@@ -106,7 +106,7 @@ export default function HomeRemedies() {
       {loading ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-500 flex flex-col items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600 mb-2" />
-          <span className="text-sm font-bold">Querying 5,100+ Kitchen Home Remedies...</span>
+          <span className="text-sm font-bold">Loading remedies...</span>
         </div>
       ) : remedies.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-500">

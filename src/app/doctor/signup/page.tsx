@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Stethoscope, AlertCircle, UploadCloud, Camera, Check, User } from 'lucide-react';
+import AuthShell, { authInput, authLabel, authPrimaryButton } from '@/components/auth/AuthShell';
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve) => {
@@ -276,113 +277,91 @@ export default function DoctorSignup() {
   };
 
   return (
-    <main className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-cream font-sans" id="doctor-signup-page">
-      {/* Visual Side */}
-      <section className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-primary-800 to-primary-700 text-white relative overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary-600 rounded-full opacity-20 filter blur-3xl"></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-gold-600 rounded-full opacity-20 filter blur-3xl"></div>
-        
-        <div className="flex items-center space-x-2 z-10">
-          <div className="w-10 h-10 rounded-xl bg-gold-600 flex items-center justify-center font-bold text-lg text-primary-850">
-            VS
-          </div>
-          <span className="font-display font-bold text-2xl tracking-wide">VedaSync</span>
-        </div>
-
-        <div className="my-auto z-10 max-w-md">
-          <div className="flex items-center space-x-2 text-gold-100 font-semibold mb-3">
-            <Stethoscope className="w-5 h-5 text-gold-600" />
-            <span>Join Our Medical Network</span>
-          </div>
-          <h1 className="font-display text-4xl lg:text-5xl font-bold leading-tight mb-6">
-            Practice Ayurveda Digitally.
-          </h1>
-          <p className="text-primary-100 text-lg">
-            Register your credentials, define your consulting fees, and start conducting video consultations with patients worldwide upon Admin validation.
-          </p>
-        </div>
-
-        <div className="text-sm text-primary-100 opacity-70 z-10">
-          &copy; 2026 VedaSync AI Health. All rights reserved.
-        </div>
-      </section>
-
-      {/* Form Side */}
-      <section className="flex items-center justify-center p-6 lg:p-12 overflow-y-auto">
-        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-100 p-8 my-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary-700 via-gold-600 to-primary-700"></div>
-
+    <AuthShell
+      wide
+      eyebrow="Join as a physician"
+      headline="Practise Ayurveda online, on your own schedule."
+      points={[
+        'Set your own consultation fee and availability',
+        'Consult patients over in-browser video',
+        'Every application is reviewed by our team before approval',
+      ]}
+    >
+      <div id="doctor-signup-page" className="rounded-3xl border border-line bg-white p-6 sm:p-8 shadow-[0_24px_60px_-40px_rgba(18,58,43,0.4)]">
           <div className="mb-6">
-            <h2 className="font-display text-2xl font-bold text-slate-800 font-display">Apply as Physician</h2>
-            <p className="text-slate-500 text-sm mt-1">Submit your medical license & qualifications for verification.</p>
+            <h2 className="font-display text-3xl font-semibold text-ink">Apply as a physician</h2>
+            <p className="mt-2 text-ink-muted">
+              Submit your qualifications and registration for review. Already applied?{' '}
+              <Link href="/doctor/login" className="font-semibold text-forest hover:underline">Sign in</Link>
+            </p>
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm mb-4 flex items-start">
+            <div className="bg-red-50 text-red-700 p-3 rounded-xl border border-red-200 text-sm mb-4 flex items-start">
               <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="text-xs font-bold text-primary-700 uppercase tracking-widest border-b border-slate-100 pb-1">1. Account Details</h3>
+            <h3 className="text-xs font-bold text-forest uppercase tracking-[0.14em] border-b border-line pb-1">1. Account Details</h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="name" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Full Name</label>
+                <label htmlFor="name" className={authLabel}>Full Name</label>
                 <input
                   id="name"
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Dr. Rajesh Sharma"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  placeholder="Dr. Full Name"
+                  className={`${authInput}`}
                 />
               </div>
               <div>
-                <label htmlFor="email" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Email Address</label>
+                <label htmlFor="email" className={authLabel}>Email Address</label>
                 <input
                   id="email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="dr.rajesh@example.com"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  placeholder="you@example.com"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="phone" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Phone Number</label>
+                <label htmlFor="phone" className={authLabel}>Phone Number</label>
                 <input
                   id="phone"
                   type="tel"
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  placeholder="+91"
+                  className={`${authInput}`}
                 />
               </div>
               <div>
-                <label htmlFor="languages" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Languages Spoken</label>
+                <label htmlFor="languages" className={authLabel}>Languages Spoken</label>
                 <input
                   id="languages"
                   type="text"
                   value={languages}
                   onChange={(e) => setLanguages(e.target.value)}
                   placeholder="English, Hindi, Sanskrit"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="password" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Password</label>
+                <label htmlFor="password" className={authLabel}>Password</label>
                 <input
                   id="password"
                   type="password"
@@ -390,11 +369,11 @@ export default function DoctorSignup() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
               <div>
-                <label htmlFor="confirmPassword" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Confirm Password</label>
+                <label htmlFor="confirmPassword" className={authLabel}>Confirm Password</label>
                 <input
                   id="confirmPassword"
                   type="password"
@@ -402,7 +381,7 @@ export default function DoctorSignup() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
@@ -420,17 +399,17 @@ export default function DoctorSignup() {
               </div>
             )}
 
-            <h3 className="text-xs font-bold text-primary-700 uppercase tracking-widest border-b border-slate-100 pt-4 pb-1">2. Professional Medical Credentials</h3>
+            <h3 className="text-xs font-bold text-forest uppercase tracking-[0.14em] border-b border-line pt-4 pb-1">2. Professional Medical Credentials</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="qualification" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Highest Degree / Qualification</label>
+                <label htmlFor="qualification" className={authLabel}>Highest Degree / Qualification</label>
                 <select
                   id="qualification"
                   required
                   value={qualification}
                   onChange={(e) => setQualification(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 >
                   <option value="">Select Degree</option>
                   <option value="BAMS">BAMS (Bachelor of Ayurvedic Medicine and Surgery)</option>
@@ -440,22 +419,22 @@ export default function DoctorSignup() {
                 </select>
               </div>
               <div>
-                <label htmlFor="regNumber" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Medical Registration Number</label>
+                <label htmlFor="regNumber" className={authLabel}>Medical Registration Number</label>
                 <input
                   id="regNumber"
                   type="text"
                   required
                   value={regNumber}
                   onChange={(e) => setRegNumber(e.target.value)}
-                  placeholder="e.g., AYUR-67890"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  placeholder="As issued by your medical council"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
-                <label htmlFor="specializations" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Areas of Specialization</label>
+                <label htmlFor="specializations" className={authLabel}>Areas of Specialization</label>
                 <input
                   id="specializations"
                   type="text"
@@ -463,11 +442,11 @@ export default function DoctorSignup() {
                   value={specializations}
                   onChange={(e) => setSpecializations(e.target.value)}
                   placeholder="e.g., Panchakarma, Kayachikitsa, Shalya Tantra"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
               <div>
-                <label htmlFor="experience" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Years of Exp</label>
+                <label htmlFor="experience" className={authLabel}>Years of Exp</label>
                 <input
                   id="experience"
                   type="number"
@@ -476,14 +455,14 @@ export default function DoctorSignup() {
                   value={experienceYears}
                   onChange={(e) => setExperienceYears(e.target.value)}
                   placeholder="5"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="fee" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Fee per Consult (INR)</label>
+                <label htmlFor="fee" className={authLabel}>Fee per Consult (INR)</label>
                 <input
                   id="fee"
                   type="number"
@@ -491,24 +470,24 @@ export default function DoctorSignup() {
                   min={100}
                   value={feePerConsult}
                   onChange={(e) => setFeePerConsult(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  className={`${authInput}`}
                 />
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="address" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Clinic / Hospital Address</label>
+                <label htmlFor="address" className={authLabel}>Clinic / Hospital Address</label>
                 <input
                   id="address"
                   type="text"
                   value={clinicAddress}
                   onChange={(e) => setClinicAddress(e.target.value)}
-                  placeholder="45 Lotus Ayurveda Hub, Lajpat Nagar, Delhi"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                  placeholder="Clinic name, street, city"
+                  className={`${authInput}`}
                 />
               </div>
             </div>
 
             <div className="pt-2">
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Upload Medical Credentials (License / Degree)</label>
+              <label className={authLabel}>Upload Medical Credentials (License / Degree)</label>
               <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition cursor-pointer relative">
                 <input
                   type="file"
@@ -537,10 +516,10 @@ export default function DoctorSignup() {
               </div>
             </div>
 
-            <h3 className="text-xs font-bold text-primary-700 uppercase tracking-widest border-b border-slate-100 pt-4 pb-1">3. Identity Verification & KYC</h3>
+            <h3 className="text-xs font-bold text-forest uppercase tracking-[0.14em] border-b border-line pt-4 pb-1">3. Identity Verification & KYC</h3>
 
             <div>
-              <label htmlFor="aadhaar" className="block text-[11px] font-bold text-slate-700 uppercase mb-1">12-Digit Aadhaar Number</label>
+              <label htmlFor="aadhaar" className={authLabel}>12-Digit Aadhaar Number</label>
               <input
                 id="aadhaar"
                 type="text"
@@ -553,7 +532,7 @@ export default function DoctorSignup() {
                   setAadhaarNumber(formatted.substring(0, 14));
                 }}
                 placeholder="1234 5678 9012"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-600 text-slate-800 text-sm"
+                className={`${authInput}`}
               />
             </div>
 
@@ -640,13 +619,12 @@ export default function DoctorSignup() {
 
             <div className="text-center text-sm font-medium text-slate-600 mt-6">
               Already have an account?{' '}
-              <Link href="/doctor/login" className="text-primary-600 font-bold hover:text-primary-700 underline transition">
+              <Link href="/doctor/login" className="text-forest font-semibold hover:underline">
                 Log in
               </Link>
             </div>
           </form>
-        </div>
-      </section>
-    </main>
+      </div>
+    </AuthShell>
   );
 }

@@ -13,15 +13,15 @@ interface ScrollRevealProps {
 
 const variants: Record<string, Variants> = {
   up: {
-    hidden: { opacity: 0, y: 40 },
+    hidden: { opacity: 0, y: 24 },
     visible: { opacity: 1, y: 0 },
   },
   left: {
-    hidden: { opacity: 0, x: -40 },
+    hidden: { opacity: 0, x: -24 },
     visible: { opacity: 1, x: 0 },
   },
   right: {
-    hidden: { opacity: 0, x: 40 },
+    hidden: { opacity: 0, x: 24 },
     visible: { opacity: 1, x: 0 },
   },
 };
@@ -40,7 +40,7 @@ export default function ScrollReveal({
       whileInView="visible"
       viewport={{ once, margin: '-10%' }}
       transition={{
-        duration: 0.7,
+        duration: 0.6,
         delay,
         ease: [0.25, 0.1, 0.25, 1],
       }}

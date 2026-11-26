@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import type { Prisma } from '@prisma/client';
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
           data: { used: true },
         });
         console.error('Admin email verification delivery failed:', error);
-        return NextResponse.json({ error: `Could not send the admin verification code to ${targetAdminEmail}. Please check email service.` }, { status: 503 });
+        return NextResponse.json({ error: 'Could not send the verification code. Please try again shortly.' }, { status: 503 });
       }
 
       const cookieStore = await cookies();
@@ -161,7 +162,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         requiresSmsOtp: true,
-        maskedPhone: targetAdminEmail,
+        maskedPhone: targetAdminEmail.replace(/^(.)[^@]*(@.*)$/, '$1•••$2'),
         message: `A verification code was sent to ${targetAdminEmail}.`,
       });
     }
@@ -204,6 +205,6 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     console.error('Login API error:', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'An error occurred during login' }, { status: 500 });
+    return apiError(error, 'An error occurred during login');
   }
 }

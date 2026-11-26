@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { LogoMark } from '@/components/brand/Logo';
 
 export default function AdminLogin() {
   const { login } = useAuth();
@@ -39,7 +40,7 @@ export default function AdminLogin() {
       if (res.ok) {
         if (data.requiresSmsOtp) {
           setSmsOtpRequired(true);
-          setMaskedPhone(data.maskedPhone || 'your admin mobile');
+          setMaskedPhone(data.maskedPhone || 'the administrator email');
           setPassword('');
         } else if (data.user) {
           login(data.user);
@@ -68,7 +69,7 @@ export default function AdminLogin() {
       if (res.ok && data.user) {
         login(data.user);
       } else {
-        setError(data.error || 'Could not verify the SMS code.');
+        setError(data.error || 'Could not verify the code.');
       }
     } catch {
       setError('Failed to reach the authentication server.');
@@ -84,32 +85,37 @@ export default function AdminLogin() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-900 p-6" id="admin-login-page">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 relative overflow-hidden border border-slate-800">
-        
-        {/* Admin top indicator bar */}
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-red-600 via-amber-500 to-red-600"></div>
-
-        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-800 border border-slate-200">
-          <ShieldCheck className="w-8 h-8" />
+    <main className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0E1A14] p-6 bg-leaf-pattern" id="admin-login-page">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl sm:p-10">
+        <div className="flex items-center gap-3">
+          <LogoMark className="h-10 w-10" />
+          <div className="leading-tight">
+            <p className="font-display text-xl font-semibold text-ink">AyurCare</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">Administration</p>
+          </div>
         </div>
 
-        <h2 className="font-display text-2xl font-bold text-center text-slate-800 tracking-wide font-display">VedaSync Control Panel</h2>
-        <p className="text-center text-slate-400 mt-2 text-xs font-semibold uppercase tracking-widest">Administrator Login Only</p>
+        <h1 className="mt-8 font-display text-3xl font-semibold text-ink">
+          {smsOtpRequired ? 'Verify it’s you' : 'Administrator sign in'}
+        </h1>
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
+          <ShieldCheck className="h-4 w-4 text-forest" /> Protected by email two-step verification
+        </p>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm mt-6 font-medium text-center animate-pulse">
-            {error}
+          <div role="alert" className="mt-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         {smsOtpRequired ? (
-          <form onSubmit={handleSmsOtpSubmit} className="mt-8 space-y-6">
-            <p className="text-center text-sm text-slate-600">
+          <form onSubmit={handleSmsOtpSubmit} className="mt-7 space-y-5">
+            <p className="text-sm text-ink-muted">
               Enter the verification code sent to <strong>{maskedPhone}</strong>.
             </p>
             <div>
-              <label htmlFor="admin-sms-otp" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">2FA Verification code (sent to email)</label>
+              <label htmlFor="admin-sms-otp" className="mb-1.5 block text-sm font-semibold text-ink">Verification code</label>
               <input
                 id="admin-sms-otp"
                 type="text"
@@ -120,16 +126,16 @@ export default function AdminLogin() {
                 required
                 value={smsOtp}
                 onChange={(e) => setSmsOtp(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="Enter 6-digit OTP"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 text-sm"
+                placeholder="Code from email"
+                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-muted/60 focus:border-forest focus:outline-none focus:ring-4 focus:ring-forest/10"
               />
             </div>
             <button
               type="submit"
               disabled={loading || smsOtp.length < 4}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md text-sm"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3.5 text-[15px] font-semibold text-white transition hover:bg-forest-deep disabled:opacity-60 cursor-pointer"
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
               Verify and continue
             </button>
             <button
@@ -141,22 +147,22 @@ export default function AdminLogin() {
             </button>
           </form>
         ) : (
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
           <div>
-            <label htmlFor="admin-email" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Admin Email</label>
+            <label htmlFor="admin-email" className="mb-1.5 block text-sm font-semibold text-ink">Email</label>
             <input
               id="admin-email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@ayurcare.ac.in"
-              className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 text-sm placeholder-slate-300"
+              placeholder="you@example.com"
+              className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-muted/60 focus:border-forest focus:outline-none focus:ring-4 focus:ring-forest/10"
             />
           </div>
 
           <div>
-            <label htmlFor="admin-pass" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Admin Password</label>
+            <label htmlFor="admin-pass" className="mb-1.5 block text-sm font-semibold text-ink">Password</label>
             <div className="relative">
               <input
                 id="admin-pass"
@@ -165,7 +171,7 @@ export default function AdminLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 text-sm placeholder-slate-300 pr-10"
+                className="w-full rounded-xl border border-line bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-muted/60 focus:border-forest focus:outline-none focus:ring-4 focus:ring-forest/10 pr-10"
               />
               <button
                 type="button"
@@ -180,16 +186,16 @@ export default function AdminLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition duration-250 flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-md text-sm"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3.5 text-[15px] font-semibold text-white transition hover:bg-forest-deep disabled:opacity-60 cursor-pointer"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-            Authenticate God-Mode
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+            Continue
           </button>
         </form>
         )}
 
-        <div className="text-center text-xs text-slate-400 mt-8 leading-relaxed">
-          Access is monitored under system audit protocols. Authorized access attempts only. IP logged.
+        <div className="mt-8 border-t border-line pt-5 text-xs leading-relaxed text-ink-muted">
+          Restricted to authorised AyurCare administrators. Administrative actions are recorded in the audit trail.
         </div>
       </div>
     </main>

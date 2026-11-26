@@ -1,3 +1,4 @@
+import { apiError, PublicError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
         });
       } else if (role === 'DOCTOR') {
         if (!doctorDetails) {
-          throw new Error('Doctor qualifications and registration details are required');
+          throw new PublicError('Doctor qualifications and registration details are required');
         }
         const { qualification, regNumber, specializations, experienceYears, feePerConsult, documents, clinicAddress, languages, aadhaarNumber, faceIdImage } = doctorDetails;
 
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
           where: { regNumber },
         });
         if (existingLicense) {
-          throw new Error('License registration number is already registered');
+          throw new PublicError('License registration number is already registered', 409);
         }
 
         await tx.doctorProfile.create({
@@ -149,6 +150,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred during registration' }, { status: 500 });
+    return apiError(error, 'An error occurred during registration');
   }
 }

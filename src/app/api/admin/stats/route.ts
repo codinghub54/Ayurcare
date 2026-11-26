@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -121,6 +122,6 @@ export async function GET() {
       growthChartData,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to fetch stats' }, { status: 500 });
+    return apiError(error, 'Failed to fetch stats');
   }
 }

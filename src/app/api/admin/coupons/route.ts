@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -31,7 +32,7 @@ export async function GET() {
     return NextResponse.json({ coupons });
   } catch (error: any) {
     console.error('Fetch coupons error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Create coupon error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -141,6 +142,6 @@ export async function PATCH(request: Request) {
     });
   } catch (error: any) {
     console.error('Update coupon error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

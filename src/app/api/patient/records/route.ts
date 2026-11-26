@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -63,7 +64,7 @@ export async function GET() {
     });
   } catch (error: any) {
     console.error('Fetch records error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 export async function POST(request: Request) {
@@ -94,6 +95,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Upload report metadata error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

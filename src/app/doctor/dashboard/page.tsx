@@ -13,7 +13,8 @@ export default function DoctorDashboard() {
   // Statistics
   const [todayBookings, setTodayBookings] = useState(0);
   const [monthEarnings, setMonthEarnings] = useState(0);
-  const [rating, setRating] = useState(4.8);
+  // Real average rating from the doctor's profile (0 means no reviews yet)
+  const rating: number = Number(user?.doctorProfile?.avgRating) || 0;
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -24,11 +25,11 @@ export default function DoctorDashboard() {
         setAppointments(json.appointments);
 
         // Aggregate statistics
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayAppts = json.appointments.filter((appt: any) => {
-          const apptDate = new Date(appt.scheduledAt).toISOString().split('T')[0];
-          return apptDate === todayStr;
-        });
+        // Compare in the doctor's local timezone (toISOString would use UTC)
+        const todayStr = new Date().toDateString();
+        const todayAppts = json.appointments.filter(
+          (appt: any) => new Date(appt.scheduledAt).toDateString() === todayStr
+        );
         setTodayBookings(todayAppts.length);
 
         // Calculate earnings (sum of completed feePaid)
@@ -63,7 +64,7 @@ export default function DoctorDashboard() {
           <p className="text-slate-500 text-sm mt-1">Hello, {user?.name}. Review today's queue and consulting metrics.</p>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-xs font-bold text-slate-600 shadow-sm">
-          Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          Today: {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
       </div>
 
@@ -84,8 +85,8 @@ export default function DoctorDashboard() {
             <CreditCard className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Practice Earnings</span>
-            <span className="text-2xl font-extrabold text-slate-800">₹{monthEarnings}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Earnings (completed)</span>
+            <span className="text-2xl font-extrabold text-slate-800">₹{monthEarnings.toLocaleString('en-IN')}</span>
           </div>
         </div>
 
@@ -95,7 +96,7 @@ export default function DoctorDashboard() {
           </div>
           <div>
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Avg Patient Rating</span>
-            <span className="text-2xl font-extrabold text-slate-800">{rating} / 5.0</span>
+            <span className="text-2xl font-extrabold text-slate-800">{rating > 0 ? `${rating.toFixed(1)} / 5.0` : 'No ratings yet'}</span>
           </div>
         </div>
       </section>

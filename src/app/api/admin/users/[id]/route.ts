@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -33,7 +34,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ user });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -162,7 +163,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
     return NextResponse.json({ message: 'User updated successfully', user: updated });
   } catch (error: any) {
     console.error('Admin user edit error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -206,6 +207,6 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
     return NextResponse.json({ message: 'User deleted permanently.' });
   } catch (error: any) {
     console.error('Admin user delete error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

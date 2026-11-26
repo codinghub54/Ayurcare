@@ -69,7 +69,7 @@ export async function sendAdminLoginCode(code: string) {
     body: new URLSearchParams({
       To: config.adminPhone,
       From: config.fromNumber,
-      Body: `Your AyurCare admin login code is ${code}. It expires in 5 minutes. Do not share this code.`,
+      Body: `Your AyurCare admin sign-in code is ${code}. It expires in 5 minutes. Do not share this code.`,
     }),
     cache: 'no-store',
     signal: AbortSignal.timeout(10000),

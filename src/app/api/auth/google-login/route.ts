@@ -1,41 +1,67 @@
 import { NextResponse } from 'next/server';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '@/lib/db';
 import { setAuthCookies } from '@/lib/jwt';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const oauthClient = new OAuth2Client();
+
+/**
+ * Google Sign-In for patients.
+ *
+ * The client sends the ID token ("credential") issued by Google Identity Services.
+ * The token's signature, audience and expiry are verified against Google before any
+ * account is looked up. Email addresses supplied directly by the client are never trusted.
+ */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { token, mockEmail, mockName } = body;
-
-    let email = mockEmail;
-    let name = mockName || 'User';
-
-    // If real token supplied, verify via Google TokenInfo API
-    if (token && token.length > 20 && !token.startsWith('mock_')) {
-      const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-      if (res.ok) {
-        const payload = await res.json();
-        if (payload.email) {
-          email = payload.email;
-          name = payload.name || name;
-        }
-      }
+    if (!GOOGLE_CLIENT_ID) {
+      return NextResponse.json({ error: 'Google sign-in is not configured.' }, { status: 503 });
     }
 
-    if (!email) {
-      return NextResponse.json({ error: 'Invalid Google OAuth Token' }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const idToken: unknown = body?.credential;
+
+    if (typeof idToken !== 'string' || idToken.length < 20) {
+      return NextResponse.json({ error: 'Missing Google credential.' }, { status: 400 });
     }
 
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
+    let payload;
+    try {
+      const ticket = await oauthClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+      payload = ticket.getPayload();
+    } catch {
+      return NextResponse.json({ error: 'Google credential could not be verified.' }, { status: 401 });
+    }
+
+    if (!payload?.email || payload.email_verified !== true) {
+      return NextResponse.json({ error: 'Your Google account email is not verified.' }, { status: 401 });
+    }
+
+    const email = payload.email.toLowerCase();
+    const name = payload.name || email.split('@')[0];
+
+    let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
+      // Google sign-in is a patient-only convenience. Doctors and admins must use
+      // their own portals (admins additionally require SMS second factor).
+      if (user.role !== 'PATIENT') {
+        return NextResponse.json(
+          { error: 'This email belongs to a practitioner or staff account. Please sign in through your own portal.' },
+          { status: 403 }
+        );
+      }
+
       if (user.status === 'SUSPENDED' || user.status === 'BANNED') {
-        return NextResponse.json({
-          error: `Your account is ${user.status.toLowerCase()}. Reason: ${user.suspensionReason || 'Violation of terms'}`,
-        }, { status: 403 });
+        return NextResponse.json(
+          {
+            error: `Your account is ${user.status.toLowerCase()}. Reason: ${user.suspensionReason || 'Violation of terms'}`,
+          },
+          { status: 403 }
+        );
       }
 
       if (user.status === 'PENDING' || !user.emailVerified) {
@@ -45,9 +71,8 @@ export async function POST(request: Request) {
         });
       }
     } else {
-      // Register a new patient account automatically
-      const randomPassword = Math.random().toString(36).substring(2, 12);
-      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      // First Google sign-in: create a patient account with an unusable random password.
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
 
       user = await prisma.$transaction(async (tx: any) => {
         const newUser = await tx.user.create({
@@ -76,10 +101,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to authenticate user' }, { status: 400 });
     }
 
-    // Set secure authentication cookies
     await setAuthCookies({ id: user.id, role: user.role, name: user.name });
 
-    // Create system log
     await prisma.auditLog.create({
       data: {
         actorUserId: user.id,
@@ -99,6 +122,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Google OAuth Login Error:', error);
-    return NextResponse.json({ error: error.message || 'Authentication failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
   }
 }

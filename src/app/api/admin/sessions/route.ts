@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ sessions });
   } catch (error: any) {
     console.error('Fetch sessions error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
 
@@ -103,6 +104,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Session revoked successfully!', session });
   } catch (error: any) {
     console.error('Revoke session error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }

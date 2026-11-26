@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/jwt';
@@ -169,6 +170,6 @@ Format your response as valid raw JSON matching these keys.`;
     return NextResponse.json({ success: true, ...result });
   } catch (error: any) {
     console.error('Analyze error:', error);
-    return NextResponse.json({ error: error.message || 'Analysis failed' }, { status: 500 });
+    return apiError(error, 'Analysis failed');
   }
 }

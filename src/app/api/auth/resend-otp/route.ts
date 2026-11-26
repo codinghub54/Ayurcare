@@ -1,3 +1,4 @@
+import { apiError } from '@/lib/api-error';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { sendOtpEmail } from '@/lib/email';
@@ -41,6 +42,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Resend OTP error:', error);
-    return NextResponse.json({ error: error.message || 'An error occurred' }, { status: 500 });
+    return apiError(error, 'An error occurred');
   }
 }
