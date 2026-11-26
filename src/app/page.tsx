@@ -87,7 +87,7 @@ const FAQS = [
   },
   {
     q: 'Does the AI assistant diagnose me?',
-    a: 'No. PrakritiAI and the report analyser give general, educational guidance based on Ayurvedic principles. They are not a diagnosis or a prescription. For any treatment decision, please consult a physician.',
+    a: 'No. AyurBot and the report analyser give general, educational guidance based on Ayurvedic principles. They are not a diagnosis or a prescription. For any treatment decision, please consult a physician.',
   },
   {
     q: 'Can I use AyurCare in an emergency?',
@@ -457,8 +457,8 @@ export default function Home() {
               {[
                 {
                   icon: MessageCircle,
-                  title: 'PrakritiAI assistant',
-                  desc: 'Ask everyday wellness questions and get answers grounded in Ayurvedic principles, with clear prompts to see a doctor when something sounds serious.',
+                  title: 'AyurBot assistant',
+                  desc: 'Ask about doshas, herbs, diet and daily routines. AyurBot can also find a physician and set up your booking, and points you to a doctor when something sounds serious.',
                   tint: 'bg-sage text-forest',
                 },
                 {

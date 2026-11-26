@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Bot,
   CalendarPlus,
   FileText,
   LockKeyhole,
@@ -16,7 +15,6 @@ import {
   Flower2,
   User,
   Sparkles,
-  Leaf,
 } from 'lucide-react';
 import PortalShell, { type PortalNavGroup } from '@/components/portal/PortalShell';
 import { PortalLoading, PortalNotice } from '@/components/portal/PortalStatus';
@@ -29,13 +27,6 @@ const NAV: PortalNavGroup[] = [
       { href: '/patient/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/patient/doctors', label: 'Book a consultation', icon: CalendarPlus },
       { href: '/patient/records', label: 'Medical records', icon: FileText },
-    ],
-  },
-  {
-    title: 'AI tools',
-    items: [
-      { href: '/patient/ayurbot', label: 'AyurBot', icon: Leaf },
-      { href: '/patient/ai-chat', label: 'PrakritiAI assistant', icon: Bot },
     ],
   },
   {

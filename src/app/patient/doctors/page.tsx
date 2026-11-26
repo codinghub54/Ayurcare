@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Search, Star, ShieldCheck, Calendar, Clock, DollarSign, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function FindAndBookDoctor() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Pre-selection handed over by AyurBot: ?doctor=<id>&date=YYYY-MM-DD&time=HH:MM&type=VIDEO
+  const pendingTime = useRef<string | null>(searchParams.get('doctor') ? searchParams.get('time') : null);
+  const prefillApplied = useRef(false);
 
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,12 +48,27 @@ export default function FindAndBookDoctor() {
     fetchDoctors();
   }, []);
 
+  useEffect(() => {
+    if (prefillApplied.current || doctors.length === 0) return;
+    const doctorId = searchParams.get('doctor');
+    if (!doctorId) return;
+    prefillApplied.current = true;
+    const doc = doctors.find((d) => d.id === doctorId);
+    if (!doc) return;
+    const type = searchParams.get('type');
+    if (type === 'VIDEO' || type === 'AUDIO' || type === 'CHAT') setApptType(type);
+    const date = searchParams.get('date');
+    if (date && dateOptions.some((o) => o.isoString === date)) setSelectedDate(date);
+    setSelectedDoctor(doc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctors]);
+
   // Set date choices: today + next 3 days
   const dateOptions = Array.from({ length: 4 }).map((_, idx) => {
     const d = new Date();
     d.setDate(d.getDate() + idx);
     return {
-      isoString: d.toISOString().split('T')[0],
+      isoString: d.toLocaleDateString('en-CA'), // local YYYY-MM-DD (toISOString would use UTC)
       displayString: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
     };
   });
@@ -91,7 +110,12 @@ export default function FindAndBookDoctor() {
       }
 
       setAvailableSlots(slots);
-      setSelectedTimeSlot(slots[0] || 'NOW');
+      if (pendingTime.current && slots.includes(pendingTime.current)) {
+        setSelectedTimeSlot(pendingTime.current);
+        pendingTime.current = null;
+      } else {
+        setSelectedTimeSlot(slots[0] || 'NOW');
+      }
     }
   }, [selectedDoctor, selectedDate]);
 

@@ -324,13 +324,13 @@ export default function HerbRemedies() {
 
             {/* Bottom Actions */}
             <div className="flex justify-between items-center pt-2">
-              <span className="text-[10px] text-slate-400 font-semibold">Source: Ayurvedic Pharmacopoeia of India</span>
+              <span className="text-[10px] text-slate-400 font-semibold">General reference only. Consult a physician before use.</span>
               <Link
-                href={`/patient/ai-chat?prompt=Tell me more about the benefits, consumption guidelines, and safety precautions of ${activeHerb.name}.`}
+                href={`/patient/dashboard?ayurbot=${encodeURIComponent(`Tell me more about the benefits, consumption guidelines, and safety precautions of ${activeHerb.name}.`)}`}
                 className="px-4 py-2 bg-primary-600 hover:bg-primary-750 text-white rounded-xl text-xs font-bold transition flex items-center shadow-md cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-                Ask PrakritiAI Bot about this
+                Ask AyurBot about this
               </Link>
             </div>
 

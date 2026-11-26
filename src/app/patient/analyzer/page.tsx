@@ -231,7 +231,7 @@ export default function AIReportAnalyser() {
             <Activity className="w-6 h-6 text-gold-100" />
           </div>
           <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-wide">PrakritiAI Universal Medical Analyser</h1>
+            <h1 className="font-display text-3xl font-extrabold tracking-wide">AyurCare Universal Medical Analyser</h1>
             <p className="text-emerald-100 text-sm mt-1">
               Upload any PDF lab report, X-Ray, MRI, or scanned document. Our OCR & AI engine extracts findings, highlights healthy & out-of-range parameters, and maps Ayurvedic pathology.
             </p>

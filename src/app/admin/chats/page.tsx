@@ -91,7 +91,7 @@ export default function FlaggedChatsReviewer() {
                     : 'bg-slate-950 text-slate-300 border border-slate-800 rounded-bl-none'
                 }`}>
                   <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
-                    {isUser ? patientName : 'PrakritiAI (Bot)'}
+                    {isUser ? patientName : 'AyurBot'}
                   </span>
                   <p className="whitespace-pre-line">{msg.content}</p>
                 </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import AyurBotWidget, { AYURBOT_OPEN_EVENT } from '@/components/ayurbot/AyurBotWidget';
 import { 
   Loader2, Calendar, Clock, Video, Heart, AlertCircle, FileText, Plus, BookOpen, 
   Smile, Droplet, Coffee, Activity, Cloud, Sun, CloudRain, Wind, ShieldCheck, 
@@ -555,22 +556,23 @@ export default function PatientDashboard() {
               </div>
             )}
 
-            {/* AI Assistant Banner */}
+            {/* AyurBot Banner */}
             <div className="bg-gradient-to-br from-gold-50/50 to-gold-100/50 border border-gold-200/50 rounded-2xl p-6 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-6 items-center">
               <div className="sm:col-span-3 space-y-2">
                 <h3 className="font-display text-lg font-bold text-slate-800 flex items-center">
-                  <Activity className="w-5 h-5 mr-2 text-gold-700" /> Consult PrakritiAI Wellness Bot
+                  <Activity className="w-5 h-5 mr-2 text-gold-700" /> Ask AyurBot
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Have symptoms or need dietary Pathya-Apathya guidance? Chat with our AI wellness assistant for preliminary recommendations, symptom triaging, and safety checks.
+                  Questions about doshas, herbs, diet or daily routines? AyurBot answers from an Ayurvedic perspective and can find a physician and set up your booking.
                 </p>
               </div>
-              <Link
-                href="/patient/ai-chat"
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent(AYURBOT_OPEN_EVENT))}
                 className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs text-center block shadow cursor-pointer transition"
               >
-                Launch Bot Chat
-              </Link>
+                Chat with AyurBot
+              </button>
             </div>
 
             {/* Premium Tabbed Navigation Panel */}
@@ -679,7 +681,7 @@ export default function PatientDashboard() {
                       <div className="pt-4 space-y-3">
                         <div className="flex items-center space-x-2 text-xs font-bold text-primary-855 uppercase tracking-widest">
                           <Sparkles className="w-4 h-4 text-gold-600 animate-pulse" />
-                          <span>PrakritiAI Dynamic Weather Guideline</span>
+                          <span>Weather-based Ayurvedic guideline</span>
                         </div>
                         
                         {weatherLoading ? (
@@ -1103,6 +1105,7 @@ export default function PatientDashboard() {
 
         </div>
       )}
+      <AyurBotWidget />
     </div>
   );
 }
